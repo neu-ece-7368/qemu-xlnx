@@ -156,6 +156,7 @@ endif #CONFIG_BSD_USER
 #########################################################
 # System emulator target
 ifdef CONFIG_SOFTMMU
+obj-y += zedmon/
 obj-y += softmmu/
 obj-y += gdbstub.o
 obj-y += hw/
@@ -206,12 +207,13 @@ dummy := $(call fix-paths,../,, \
               chardev-obj-y \
               crypto-obj-y \
               io-obj-y \
+              zedmon-obj-y \
               qom-obj-y)
 dummy := $(call unnest-vars,..,common-obj-y)
-
 all-obj-y += $(common-obj-y)
 all-obj-y += $(qom-obj-y)
 all-obj-$(CONFIG_SOFTMMU) += $(authz-obj-y)
+all-obj-y += $(zedmon-obj-y)
 all-obj-$(CONFIG_SOFTMMU) += $(block-obj-y) $(chardev-obj-y)
 all-obj-$(CONFIG_SOFTMMU) += $(crypto-obj-y)
 all-obj-$(CONFIG_SOFTMMU) += $(io-obj-y)

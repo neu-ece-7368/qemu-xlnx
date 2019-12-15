@@ -1,0 +1,4 @@
+zedmon-obj-y = zedmon.o
+zedmon-obj-y += mqueue.o
+
+zedmon.o-libs := $(ZMQ_LIBS)

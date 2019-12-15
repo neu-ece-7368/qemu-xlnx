@@ -31,6 +31,8 @@
 #include "qemu/bitops.h"
 #include "qemu/log.h"
 #include "hw/irq.h"
+#include "zedmon/zedmon.h"
+#include <unistd.h>
 
 #ifndef XLNX_AXI_GPIO_ERR_DEBUG
 #define XLNX_AXI_GPIO_ERR_DEBUG 0
@@ -66,6 +68,30 @@ typedef struct XlnxAXIGPIO {
     uint32_t regs[R_MAX];
     RegisterInfo regs_info[R_MAX];
 } XlnxAXIGPIO;
+
+#define MAX_GPIOCHIP_COUNT 32
+typedef struct XlnxAXIGPIOClass {
+    unsigned int chip_count;
+    XlnxAXIGPIO* chips[MAX_GPIOCHIP_COUNT];
+} XlnxAXIGPIOClass;
+
+static XlnxAXIGPIOClass gpioClass;
+
+static int find_axi_gpio_chip_number(XlnxAXIGPIO* s)
+{
+    unsigned int chips = gpioClass.chip_count;
+
+    while(chips > 0)
+    {
+        if (gpioClass.chips[chips-1] == s)
+        {
+            return chips;
+        }
+        chips--;;
+    }
+
+    return -1;
+}
 
 /* The interrupts should be triggered when a change arrives on the GPIO pins */
 static void irq_update(XlnxAXIGPIO *s)
@@ -133,6 +159,7 @@ static void xlnx_axi_gpio_data_post_write(XlnxAXIGPIO *s, uint64_t val,
 
         gpio_set = extract32(val, i, 1);
 
+        //weird that you generate interrupts when they are outputs
         switch (channel) {
         case 1:
             qemu_set_irq(s->outputs1[i], gpio_set);
@@ -168,13 +195,13 @@ static void xlnx_axi_gpio_post_write(RegisterInfo  *reg, uint64_t val)
 static uint64_t xlnx_axi_gpi_data_read(RegisterInfo  *reg, uint64_t val,
                                        uint8_t channel)
 {
-    XlnxAXIGPIO *s = XLNX_AXI_GPIO(reg->opaque);
+    //XlnxAXIGPIO *s = XLNX_AXI_GPIO(reg->opaque);
 
     switch (channel) {
-    case 1:
-        return val & s->regs[R_GPIO_TRI];
-    case 2:
-        return val & s->regs[R_GPIO2_TRI];
+        //case 1:
+        //    return val & s->regs[R_GPIO_TRI];
+        //case 2:
+        //    return val & s->regs[R_GPIO2_TRI];
     default:
         return val;
     }
@@ -220,15 +247,149 @@ static void xlnx_axi_gpio_reset(DeviceState *dev)
     irq_update(s);
 }
 
+static uint64_t xlnx_axi_gpio_read(void *opaque, hwaddr addr, unsigned size)
+{
+    XlnxAXIGPIO *s = XLNX_AXI_GPIO(opaque);
+    RegisterInfo *r = &s->regs_info[addr / 4];
+
+    if (!r->data) {
+        qemu_log("%s: Decode error: read from %" HWADDR_PRIx "\n",
+                 object_get_canonical_path(OBJECT(s)),
+                 addr);
+        return 0;
+    }
+    return register_read(r, 0xFF, NULL, false);
+}
+
+static void xlnx_axi_gpio_write(void *opaque, hwaddr addr, uint64_t value,
+                      unsigned size)
+{
+    XlnxAXIGPIO *s = XLNX_AXI_GPIO(opaque);
+    RegisterInfo *r = &s->regs_info[addr / 4];
+    GPIOEvent * evt;
+    int ret;
+
+    if (!r->data) {
+        qemu_log("%s: Decode error: write to %" HWADDR_PRIx "=%" PRIx64 "\n",
+                 object_get_canonical_path(OBJECT(s)),
+                 addr, value);
+        return;
+    }
+
+    register_write(r, value, ~0, NULL, false);
+
+
+    //publish event
+    evt = (GPIOEvent*)malloc(sizeof(GPIOEvent));
+
+    if (!evt)
+    {
+        return;
+    }
+
+    if (addr == 0x00 || addr == 0x08)
+    {
+        evt->type = GPIO_EVT_VALUE;
+        if (addr == 0x00)
+        {
+            evt->channel = 0;
+        }
+        else
+        {
+            evt->channel = 1;
+        }
+    }
+    else if (addr == 0x04 || addr == 0x0C)
+    {
+        evt->type = GPIO_EVT_DIRECTION;
+        if (addr == 0x04)
+        {
+            evt->channel = 0;
+        }
+        else
+        {
+            evt->channel = 1;
+        }
+    }
+    else
+    {
+        return;
+    }
+
+    //set value
+    evt->data = (void*)value;
+    ret = find_axi_gpio_chip_number(s);
+    if (ret < 0)
+    {
+        //error
+        //return;
+        ret = 0xFF;
+    }
+    evt->gpio_dev = ret;
+
+    //publish
+    ret = zedmon_notify_event(ZEDMON_EVENT_CLASS_GPIO, evt, ZEDMON_EVENT_FLAG_DESTROY);
+    if(ret)
+    {
+        //error occurred
+    }
+
+}
+
 static const MemoryRegionOps xlnx_axi_gpio_ops = {
-    .read = register_read_memory,
-    .write = register_write_memory,
+    .read = xlnx_axi_gpio_read,
+    .write = xlnx_axi_gpio_write,
     .endianness = DEVICE_LITTLE_ENDIAN,
     .valid = {
         .min_access_size = 4,
         .max_access_size = 4,
     },
 };
+
+static int xlnx_axi_gpio_write_from_monitor(unsigned int pIdx,
+                                            unsigned int dIdx, void* data)
+{
+
+    if (!data)
+    {
+        return -1;
+    }
+
+    if (pIdx > gpioClass.chip_count)
+    {
+        return -1;
+    }
+
+    xlnx_axi_gpio_write(gpioClass.chips[pIdx], dIdx, *(uint64_t*)data, 0);
+
+    return 0;
+}
+
+static int xlnx_axi_gpio_read_from_monitor(unsigned int pIdx,
+                                           unsigned int dIdx, void* data)
+{
+    uint64_t regVal;
+
+    if (!data)
+    {
+        //return some error
+        return -1;
+    }
+
+    if (pIdx > gpioClass.chip_count)
+    {
+        //return some error
+        return -1;
+    }
+
+    //do read
+    regVal = xlnx_axi_gpio_read(gpioClass.chips[pIdx], dIdx, 0);
+
+    //set value
+    *(uint64_t*)data = regVal;
+
+    return 0;
+}
 
 static void xlnx_axi_gpio_init(Object *obj)
 {
@@ -259,6 +420,9 @@ static void xlnx_axi_gpio_init(Object *obj)
     /* Create GPIO banks as well */
     qdev_init_gpio_out(DEVICE(obj), s->outputs1, 32);
     qdev_init_gpio_out(DEVICE(obj), s->outputs2, 32);
+
+    //class-wide book keeping
+    gpioClass.chips[gpioClass.chip_count++] = s;
 }
 
 static const VMStateDescription vmstate_gpio = {
@@ -278,6 +442,14 @@ static void xlnx_axi_gpio_class_init(ObjectClass *klass, void *data)
 
     dc->reset = xlnx_axi_gpio_reset;
     dc->vmsd = &vmstate_gpio;
+
+    //reset
+    memset(&gpioClass, 0, sizeof(XlnxAXIGPIOClass));
+
+    //register
+    zedmon_register_peripheral(ZEDMON_EVENT_CLASS_GPIO, "AXIGPIO",
+                               xlnx_axi_gpio_read_from_monitor,
+                               xlnx_axi_gpio_write_from_monitor);
 }
 
 static const TypeInfo xlnx_axi_gpio_info = {

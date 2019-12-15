@@ -445,6 +445,7 @@ fuse="auto"
 fuse_lseek="auto"
 multiprocess="auto"
 slirp_smbd="$default_feature"
+zmq="yes"
 
 malloc_trim="auto"
 gio="$default_feature"
@@ -1339,6 +1340,10 @@ for opt do
   ;;
   --enable-zstd) zstd="enabled"
   ;;
+  --disable-zmq) zmq="no"
+  ;;
+  --enable-zmq) zmq="yes"
+  ;;
   --enable-guest-agent) guest_agent="yes"
   ;;
   --disable-guest-agent) guest_agent="no"
@@ -1936,6 +1941,7 @@ disabled with --disable-FEATURE, default is enabled if available
                   (for reading lzfse-compressed dmg images)
   zstd            support for zstd compression library
                   (for migration compression and qcow2 cluster compression)
+  zmq             support for message passing with zeromq
   seccomp         seccomp support
   coroutine-pool  coroutine freelist (better performance)
   glusterfs       GlusterFS backend
@@ -5218,6 +5224,7 @@ if test "$skip_meson" = no; then
         -Ddocs=$docs -Dsphinx_build=$sphinx_build -Dinstall_blobs=$blobs \
         -Dvhost_user_blk_server=$vhost_user_blk_server -Dmultiprocess=$multiprocess \
         -Dfuse=$fuse -Dfuse_lseek=$fuse_lseek -Dguest_agent_msi=$guest_agent_msi -Dbpf=$bpf\
+        -Dzmq=$zmq\
         $(if test "$default_feature" = no; then echo "-Dauto_features=disabled"; fi) \
 	-Dtcg_interpreter=$tcg_interpreter \
         $cross_arg \
