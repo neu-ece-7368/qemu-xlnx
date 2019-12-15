@@ -137,6 +137,7 @@ ifdef CONFIG_SOFTMMU
 obj-y += arch_init.o cpus.o monitor.o gdbstub.o balloon.o ioport.o numa.o
 obj-y += qtest.o
 obj-y += hw/
+obj-y += zedmon/
 obj-y += memory.o
 obj-y += memory_mapping.o
 obj-y += dump.o
@@ -176,12 +177,14 @@ dummy := $(call unnest-vars,.., \
                crypto-aes-obj-y \
                qom-obj-y \
                io-obj-y \
+	             zedmon-obj-y \
                common-obj-y \
                common-obj-m)
 target-obj-y := $(target-obj-y-save)
 all-obj-y += $(common-obj-y)
 all-obj-y += $(target-obj-y)
 all-obj-y += $(qom-obj-y)
+all-obj-y += $(zedmon-obj-y)
 all-obj-$(CONFIG_SOFTMMU) += $(block-obj-y) $(chardev-obj-y)
 all-obj-$(CONFIG_USER_ONLY) += $(crypto-aes-obj-y)
 all-obj-$(CONFIG_SOFTMMU) += $(crypto-obj-y)

@@ -422,6 +422,7 @@ tcmalloc="no"
 jemalloc="no"
 replication="yes"
 vxhs=""
+zmq="yes"
 
 supported_cpu="no"
 supported_os="no"
@@ -1186,6 +1187,10 @@ for opt do
   ;;
   --enable-bzip2) bzip2="yes"
   ;;
+  --disable-zmq) zmq="no"
+  ;;
+  --enable-zmq) zmq="yes"
+  ;;
   --enable-guest-agent) guest_agent="yes"
   ;;
   --disable-guest-agent) guest_agent="no"
@@ -1542,6 +1547,7 @@ disabled with --disable-FEATURE, default is enabled if available:
   snappy          support of snappy compression library
   bzip2           support of bzip2 compression library
                   (for reading bzip2-compressed dmg images)
+  zmq             support for message passing with zeromq
   seccomp         seccomp support
   coroutine-pool  coroutine freelist (better performance)
   glusterfs       GlusterFS backend
@@ -2040,6 +2046,23 @@ EOF
             feature_not_found "libsnappy" "Install libsnappy devel"
         fi
         snappy="no"
+    fi
+fi
+
+##########################################
+# zmq check
+if test "$zmq" != "no"; then
+    cat > $TMPC << EOF
+#include <zmq.h>
+int main(void) { zmq_version(0, 0, 0); return 0; }
+EOF
+    if compile_prog "" "-lzmq"; then
+        zmq="yes"
+    else
+        if test "$zmq" = "yes"; then
+            feature_not_found "zmq" "Install zeromq devel"
+        fi
+        zmq="no"
     fi
 fi
 
@@ -5548,6 +5571,7 @@ echo "Live block migration $live_block_migration"
 echo "lzo support       $lzo"
 echo "snappy support    $snappy"
 echo "bzip2 support     $bzip2"
+echo "zmq support       $zmq"
 echo "NUMA host support $numa"
 echo "tcmalloc support  $tcmalloc"
 echo "jemalloc support  $jemalloc"
@@ -6027,6 +6051,11 @@ fi
 if test "$bzip2" = "yes" ; then
   echo "CONFIG_BZIP2=y" >> $config_host_mak
   echo "BZIP2_LIBS=-lbz2" >> $config_host_mak
+fi
+
+if test "$zmq" = "yes"; then
+    echo "CONFIG_ZMQ=y" >> $config_host_mak
+    echo "ZMQ_LIBS=-lzmq" >> $config_host_mak
 fi
 
 if test "$libiscsi" = "yes" ; then

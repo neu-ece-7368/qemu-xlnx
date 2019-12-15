@@ -33,6 +33,8 @@ qom-obj-y = qom/
 
 io-obj-y = io/
 
+zedmon-obj-y = zedmon/
+
 ######################################################################
 # Target independent part of system emulation. The long term path is to
 # suppress *all* target specific code in case of system emulation, i.e. a
@@ -52,6 +54,7 @@ common-obj-y += migration/
 
 common-obj-y += audio/
 common-obj-y += hw/
+common-obj-y += zedmon/
 
 common-obj-y += replay/
 
@@ -87,6 +90,7 @@ endif
 # Target-independent parts used in system and user emulation
 common-obj-y += cpus-common.o
 common-obj-y += hw/
+common-obj-y += zedmon/
 common-obj-y += qom/
 common-obj-y += disas/
 
