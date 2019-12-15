@@ -35,6 +35,8 @@ storage-daemon-obj-y += blockdev.o blockdev-nbd.o iothread.o job-qmp.o
 storage-daemon-obj-$(CONFIG_WIN32) += os-win32.o
 storage-daemon-obj-$(CONFIG_POSIX) += os-posix.o
 
+zedmon-obj-y = zedmon/
+
 ######################################################################
 # Target independent part of system emulation. The long term path is to
 # suppress *all* target specific code in case of system emulation, i.e. a
@@ -59,6 +61,7 @@ common-obj-y += migration/
 common-obj-y += audio/
 common-obj-m += audio/
 common-obj-y += hw/
+common-obj-y += zedmon/
 
 common-obj-y += replay/
 
@@ -85,6 +88,7 @@ endif # CONFIG_SOFTMMU
 # Target-independent parts used in system and user emulation
 common-obj-y += cpus-common.o
 common-obj-y += hw/
+common-obj-y += zedmon/
 common-obj-y += qom/
 common-obj-y += disas/
 
