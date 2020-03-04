@@ -12,3 +12,7 @@
   #+BEGIN_SRC
 ./configure --target-list="aarch64-softmmu" --enable-fdt --disable-kvm --disable-xen --disable-gtk --disable-werror
   #+END_SRC
+
+** Fixing configure python issues
+
+  ~configure~ will fail if default python executable version is >= 3. To circumvent, use ~--python=/path/to/python2.7~
