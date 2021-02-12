@@ -247,37 +247,57 @@ static void xlnx_axi_gpio_reset(DeviceState *dev)
     irq_update(s);
 }
 
+// NOTE: this is a placeholder function
 static uint64_t xlnx_axi_gpio_read(void *opaque, hwaddr addr, unsigned size)
 {
-    XlnxAXIGPIO *s = XLNX_AXI_GPIO(opaque);
-    RegisterInfo *r = &s->regs_info[addr / 4];
 
-    if (!r->data) {
-        qemu_log("%s: Decode error: read from %" HWADDR_PRIx "\n",
-                 object_get_canonical_path(OBJECT(s)),
-                 addr);
-        return 0;
+    XlnxAXIGPIO *s = NULL;
+    RegisterInfoArray *reg_array = opaque;
+    RegisterInfo *reg = NULL;
+    int i;
+
+    for (i = 0; i < reg_array->num_elements; i++) {
+      if (reg_array->r[i]->access->addr == addr) {
+        reg = reg_array->r[i];
+        break;
+      }
     }
-    return register_read(r, 0xFF, NULL, false);
+
+    if (!reg) {
+        return -1;
+    }
+
+    s = XLNX_AXI_GPIO(reg->opaque);
+
+    // TODO: do something with s
+
+    return register_read_memory(opaque, addr, size);
 }
 
-static void xlnx_axi_gpio_write(void *opaque, hwaddr addr, uint64_t value,
-                      unsigned size)
+static void xlnx_axi_gpio_write(void *opaque, hwaddr addr,
+                                uint64_t value, unsigned size)
 {
-    XlnxAXIGPIO *s = XLNX_AXI_GPIO(opaque);
-    RegisterInfo *r = &s->regs_info[addr / 4];
-    GPIOEvent * evt;
+    RegisterInfoArray *reg_array = opaque;
+    RegisterInfo *reg = NULL;
+    XlnxAXIGPIO *s = NULL;
+    GPIOEvent *evt;
     int ret;
+    int i;
 
-    if (!r->data) {
-        qemu_log("%s: Decode error: write to %" HWADDR_PRIx "=%" PRIx64 "\n",
-                 object_get_canonical_path(OBJECT(s)),
-                 addr, value);
-        return;
+    for (i = 0; i < reg_array->num_elements; i++) {
+      if (reg_array->r[i]->access->addr == addr) {
+        reg = reg_array->r[i];
+        break;
+      }
     }
 
-    register_write(r, value, ~0, NULL, false);
+    register_write_memory(opaque, addr, value, size);
 
+    if (!reg) {
+       return;
+    }
+
+    s = XLNX_AXI_GPIO(reg->opaque);
 
     //publish event
     evt = (GPIOEvent*)malloc(sizeof(GPIOEvent));
@@ -328,7 +348,8 @@ static void xlnx_axi_gpio_write(void *opaque, hwaddr addr, uint64_t value,
     evt->gpio_dev = ret;
 
     //publish
-    ret = zedmon_notify_event(ZEDMON_EVENT_CLASS_GPIO, evt, ZEDMON_EVENT_FLAG_DESTROY);
+    ret = zedmon_notify_event(ZEDMON_EVENT_CLASS_GPIO, evt,
+                              ZEDMON_EVENT_FLAG_DESTROY);
     if(ret)
     {
         //error occurred
