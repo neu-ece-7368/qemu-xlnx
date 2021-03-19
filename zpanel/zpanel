@@ -1,0 +1,87 @@
+#!/usr/bin/env python3
+
+import re
+import signal
+import logging
+from argparse import ArgumentParser
+from zmon.zcli import ZEvtClient, ZCmdClient
+from zmon.web import ZWebInterface
+
+
+def parse_address(addr_str):
+    """Parse address."""
+    ADDRESS_REGEX = re.compile(r'([0-9a-zA-Z\.]+):([0-9]+)')
+
+    m = ADDRESS_REGEX.match(addr_str)
+    if m is None:
+        raise ValueError('invalid address')
+
+    return [m.group(1), int(m.group(2))]
+
+
+if __name__ == "__main__":
+
+    def _handle_signal(*args):
+        # stop threads
+        zevt.stop()
+        zevt.join()
+        zcmd.stop()
+        zcmd.join()
+
+        # quit
+        exit(0)
+
+    # setup signals
+    signal.signal(signal.SIGTERM, _handle_signal)
+
+    parser = ArgumentParser(description='ZPanel')
+    parser.add_argument('--publisher-addr', help='address of event publisher',
+                        default='127.0.0.1:20000')
+    parser.add_argument('--server-addr', help='address of control server',
+                        default='127.0.0.1:20001')
+
+    args = parser.parse_args()
+
+    # setup logger
+    logging.basicConfig(level=logging.DEBUG,
+                        filename='zpanel.log',
+                        filemode='w',
+                        format='%(asctime)s - %(name)s -'
+                        ' %(levelname)s - %(message)s')
+
+    console = logging.StreamHandler()
+    console.setLevel(logging.INFO)
+    logging.getLogger('').addHandler(console)
+    main_logger = logging.getLogger('zpanel')
+    main_logger.info('Starting ZPanel...')
+
+    # parse addresses
+    try:
+        pub_addr = parse_address(args.publisher_addr)
+    except ValueError:
+        main_logger.error('invalid address: "{}"'
+                          .format(args.publisher_addr))
+        exit(1)
+
+    try:
+        server_addr = parse_address(args.server_addr)
+    except ValueError:
+        main_logger.error('invalid address: "{}"'.format(args.server_addr))
+        exit(1)
+
+    # instantiate subscription client
+
+    zcmd = ZCmdClient(*server_addr)
+    zweb = ZWebInterface('0.0.0.0', 8000, zcmd)
+    zevt = ZEvtClient(*pub_addr, evt_callback=zweb.register_event)
+
+    # start threads
+    zevt.start()
+    zcmd.start()
+
+    # run web interface
+    zweb.run()
+
+    main_logger.info('Stopping...')
+    # quit
+    _handle_signal(None)
