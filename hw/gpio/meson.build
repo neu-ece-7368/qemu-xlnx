@@ -2,7 +2,8 @@ softmmu_ss.add(when: 'CONFIG_XILINX_IOMODULE_GPI', if_true: files('xilinx_iomod_
 softmmu_ss.add(when: 'CONFIG_XILINX_IOMODULE_GPO', if_true: files('xilinx_iomod_gpo.c'))
 softmmu_ss.add(when: 'CONFIG_XLNX_ZYNQMP', if_true: files(
   'xilinx-axi-gpio.c',
-  'xlnx-zynqmp-gpio.c'))
+  'xlnx-zynqmp-gpio.c',
+  'xlnx-axi-fifo.c'))
 
 softmmu_ss.add(when: 'CONFIG_E500', if_true: files('mpc8xxx.c'))
 softmmu_ss.add(when: 'CONFIG_GPIO_KEY', if_true: files('gpio_key.c'))

@@ -15,6 +15,7 @@
 static const TypeInfo fdt_qom_aliases[] = {
     {   .name = "arasan,sdhci-8.9a",        .parent = "xilinx.zynqmp-sdhci" },
     {   .name = "xlnx,xps-gpio-1.00.a",     .parent = "xlnx.axi-gpio"       },
+    {   .name = "xlnx,axi-fifo-mm-s-4.2",   .parent = "xlnx.axi-fifo"       },
     {   .name = "xlnx,axi-dpdma-1.0",       .parent = "xlnx.dpdma"          },
     {   .name = "xlnx,ps7-can-1.00.a",      .parent = "xlnx.zynqmp-can"     },
 };
