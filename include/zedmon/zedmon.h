@@ -3,6 +3,7 @@
 
 //event classes
 #define ZEDMON_EVENT_CLASS_GPIO 0x00
+#define ZEDMON_EVENT_CLASS_TIMER 0x01
 
 //errors
 #define ZEDMON_ERR_PERIPH_LIMIT -13
@@ -27,6 +28,13 @@ typedef struct GPIOEvent {
     void* period;
     void* duty_cycle;
 } GPIOEvent;
+
+#define TIMER_EVT_ENABLE 0
+#define TIMER_EVT_DUTY 1
+typedef struct TimerEvent {
+    unsigned char type;
+    void* data;
+} TimerEvent;
 
 //callback types
 typedef int (*ZedmonReadCallback)(unsigned int pIdx, unsigned int dIdx, void* data);

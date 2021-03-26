@@ -30,6 +30,7 @@
 #include "qemu/log.h"
 #include "qemu/module.h"
 #include "qom/object.h"
+#include "zedmon/zedmon.h"
 
 #define D(x)
 
@@ -157,8 +158,11 @@ timer_write(void *opaque, hwaddr addr,
 {
     struct timerblock *t = opaque;
     struct xlx_timer *xt;
+    struct xlx_timer *ot;
     unsigned int timer;
     uint32_t value = val64;
+    TimerEvent *evt;
+    int ret;
 
     addr >>= 2;
     timer = timer_from_addr(addr);
@@ -174,13 +178,38 @@ timer_write(void *opaque, hwaddr addr,
                 value &= ~TCSR_TINT;
 
             xt->regs[addr] = value & 0x7ff;
+            // enabling single timer
             if (value & TCSR_ENT) {
                 ptimer_transaction_begin(xt->ptimer);
                 timer_enable(xt);
                 ptimer_transaction_commit(xt->ptimer);
             }
+            // enabling both timers 
+            if (value & TCSR_ENALL) {
+                // TODO
+            }
             break;
- 
+        case R_TLR:
+            xt->regs[addr] = value;
+            if(timer == 1) {
+                evt = (TimerEvent*)malloc(sizeof(TimerEvent));
+                if (!evt)
+                {
+                return;
+                }
+                evt->type = TIMER_EVT_DUTY;
+                ot = &t->timers[0];
+                uint64_t duty_cycle = 100 - (((float)((xt->regs[addr]) - (ot->regs[R_TLR])))/1000.0);
+                // printf("duty cycle percentage: %llu\n", duty_cycle);
+                evt->data = (void*)duty_cycle;
+                ret = zedmon_notify_event(ZEDMON_EVENT_CLASS_TIMER, evt,
+                              ZEDMON_EVENT_FLAG_DESTROY);
+                if(ret)
+                {
+                    //error occurred
+                }
+            }
+            break;
         default:
             if (addr < ARRAY_SIZE(xt->regs))
                 xt->regs[addr] = value;
