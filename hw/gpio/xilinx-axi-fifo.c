@@ -45,32 +45,19 @@ typedef struct XlnxAXIFIFO {
     RegisterInfo regs_info[R_MAX];
 } XlnxAXIFIFO;
 
-static void xlnx_axi_fifo_post_write(RegisterInfo  *reg, uint64_t val)
+static void xlnx_axi_fifo_post_data_write(RegisterInfo  *reg, uint64_t val)
 {
-    printf("in post write\n");
-}
-
-static uint64_t xlnx_axi_fifo_post_read(RegisterInfo  *reg, uint64_t val)
-{
-    printf("in post read\n");
-    return val;
+    printf("wrote sample to fifo\n");
 }
 
 static RegisterAccessInfo  xlnx_axi_fifo_regs_info[] = {
     {   .name = "ISR",  .addr = A_ISR,
-        .post_read = xlnx_axi_fifo_post_read,
-        .post_write = xlnx_axi_fifo_post_write,
     },{ .name = "IER",  .addr = A_IER,
-        .post_read = xlnx_axi_fifo_post_read,
-        .post_write = xlnx_axi_fifo_post_write,
     },{ .name = "TDFR",  .addr = A_TDFR,
-        .post_write = xlnx_axi_fifo_post_write,
     },{ .name = "TDFV",  .addr = A_TDFV,
-        .post_read = xlnx_axi_fifo_post_read,
     },{ .name = "TDFD",  .addr = A_TDFD,
-        .post_write = xlnx_axi_fifo_post_write,
+        .post_write = xlnx_axi_fifo_post_data_write,
     },{ .name = "TLR",  .addr = A_TLR,
-        .post_write = xlnx_axi_fifo_post_write,
     },{ .name = "RDFR",  .addr = A_RDFR,
     },{ .name = "RDFO",  .addr = A_RDFO,
     },{ .name = "RDFD",  .addr = A_RDFD,
@@ -122,9 +109,6 @@ static void xlnx_axi_fifo_init(Object *obj)
                                 &reg_array->mem);
 
     sysbus_init_mmio(sbd, &s->iomem);
-
-    printf("FIFO instance init\n");
-
 }
 
 static void xlnx_axi_fifo_class_init(ObjectClass *klass, void *data)
@@ -132,8 +116,6 @@ static void xlnx_axi_fifo_class_init(ObjectClass *klass, void *data)
     DeviceClass *dc = DEVICE_CLASS(klass);
 
     dc->reset = xlnx_axi_fifo_reset;
-
-    printf("FIFO class init\n");
 }
 
 static const TypeInfo xlnx_axi_fifo_info = {
