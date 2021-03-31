@@ -115,6 +115,8 @@
 #include "sysemu/iothread.h"
 #include "qemu/guest-random.h"
 
+#include "zedmon/zedmon.h"
+
 #define MAX_VIRTIO_CONSOLES 1
 
 static const char *data_dir[16];
@@ -2863,6 +2865,10 @@ void qemu_init(int argc, char **argv, char **envp)
     os_set_line_buffering();
 
     error_init(argv[0]);
+
+    // zedmon
+    zedmon_init();
+
     module_call_init(MODULE_INIT_TRACE);
 
     qemu_init_cpu_list();
