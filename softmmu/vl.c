@@ -130,6 +130,7 @@
 #include "qemu/guest-random.h"
 
 #include "config-host.h"
+#include "zedmon/zedmon.h"
 
 #define MAX_VIRTIO_CONSOLES 1
 
@@ -2767,7 +2768,11 @@ void qemu_init(int argc, char **argv, char **envp)
     qemu_add_opts(&qemu_icount_opts);
     qemu_add_opts(&qemu_semihosting_config_opts);
     qemu_add_opts(&qemu_fw_cfg_opts);
+
     qemu_add_opts(&qemu_action_opts);
+    // zedmon
+    zedmon_init();
+
     module_call_init(MODULE_INIT_OPTS);
 
     error_init(argv[0]);
