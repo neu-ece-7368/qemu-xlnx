@@ -152,8 +152,13 @@ static void timer_enable(struct xlx_timer *xt)
     ptimer_run(xt->ptimer, 1);
 }
 
-static int create_timer_duty_event(TimerEvent* evt, uint64_t duty_cycle) {
+static int create_timer_duty_event(uint64_t duty_cycle) {
     int ret;
+    TimerEvent *evt;
+    evt = (TimerEvent*)malloc(sizeof(TimerEvent));
+    if (!evt) { 
+        return -1; 
+    }
     evt->type = TIMER_EVT_DUTY;
     evt->data = (void*)duty_cycle;
     ret = zedmon_notify_event(ZEDMON_EVENT_CLASS_TIMER, evt, ZEDMON_EVENT_FLAG_DESTROY);
@@ -170,7 +175,6 @@ timer_write(void *opaque, hwaddr addr,
     struct xlx_timer *ot;
     unsigned int timer;
     uint32_t value = val64;
-    TimerEvent *evt;
     int ret;
 
     addr >>= 2;
@@ -198,10 +202,8 @@ timer_write(void *opaque, hwaddr addr,
                 ot = (timer == 0) ? &t->timers[1] : &t->timers[0];
                 // check that both timers are enabled before sending event 
                 if (ot->regs[addr] & TCSR_ENT) {
-                    evt = (TimerEvent*)malloc(sizeof(TimerEvent));
-                    if (!evt) { return; }
                     uint64_t duty_cycle = 100 - (((float)((timer1->regs[R_TLR]) - (timer0->regs[R_TLR])))/1000.0);
-                    ret = create_timer_duty_event(evt, duty_cycle);
+                    ret = create_timer_duty_event(duty_cycle);
                     if(ret) { 
                         //error occurred
                     }
@@ -210,10 +212,8 @@ timer_write(void *opaque, hwaddr addr,
             // timer disabled 
             if (value & !TCSR_ENT) {
                 printf("single timer disabled\n");
-                evt = (TimerEvent*)malloc(sizeof(TimerEvent));
-                if (!evt) { return; }
                 uint64_t duty_cycle = 0;
-                ret = create_timer_duty_event(evt, duty_cycle);
+                ret = create_timer_duty_event(duty_cycle);
                 if(ret) { 
                     //error occurred
                 }
@@ -230,12 +230,10 @@ timer_write(void *opaque, hwaddr addr,
                 timer_enable(timer1);
                 ptimer_transaction_commit(timer1->ptimer);
                 // setting individual timers TCSR_ENT bit
-                timer0->regs[addr] |= (1 << 7);
-                timer1->regs[addr] |= (1 << 7);
-                evt = (TimerEvent*)malloc(sizeof(TimerEvent));
-                if (!evt) { return; }
+                timer0->regs[addr] |= TCSR_ENT;
+                timer1->regs[addr] |= TCSR_ENT;
                 uint64_t duty_cycle = 100 - (((float)((timer1->regs[R_TLR]) - (timer0->regs[R_TLR])))/1000.0);
-                ret = create_timer_duty_event(evt, duty_cycle);
+                ret = create_timer_duty_event(duty_cycle);
                 if(ret) {
                     //error occurred
                 }
@@ -247,11 +245,10 @@ timer_write(void *opaque, hwaddr addr,
             struct xlx_timer *timer0 = &t->timers[0];
             struct xlx_timer *timer1 = &t->timers[1];
             // check that both timers are enabled
-            if (((((timer0->regs[R_TCSR]) & (1 << 7)) >> 7) == 1) & ((((timer1->regs[R_TCSR]) & (1 << 7)) >> 7) == 1)) {
-                evt = (TimerEvent*)malloc(sizeof(TimerEvent));
-                if (!evt) { return; }
+            if ((timer0->regs[R_TCSR] & TCSR_ENT) && (timer1->regs[R_TCSR] & TCSR_ENT)) {
+                printf("creating writing to R_TLR event");
                 uint64_t duty_cycle = 100 - (((float)((timer1->regs[R_TLR]) - (timer0->regs[R_TLR])))/1000.0);
-                ret = create_timer_duty_event(evt, duty_cycle);
+                ret = create_timer_duty_event(duty_cycle);
                 if(ret) {
                     //error occurred
                 }
