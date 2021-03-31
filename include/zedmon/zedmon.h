@@ -29,8 +29,7 @@ typedef struct GPIOEvent {
     void* duty_cycle;
 } GPIOEvent;
 
-#define TIMER_EVT_ENABLE 0
-#define TIMER_EVT_DUTY 1
+#define TIMER_EVT_DUTY 0
 typedef struct TimerEvent {
     unsigned char type;
     void* data;
