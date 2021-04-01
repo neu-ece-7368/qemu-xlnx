@@ -43,11 +43,79 @@ typedef struct XlnxAXIFIFO {
 
     uint32_t regs[R_MAX];
     RegisterInfo regs_info[R_MAX];
+
+    unsigned int samples_written;
+    FILE* wavefile;
 } XlnxAXIFIFO;
 
-static void xlnx_axi_fifo_post_data_write(RegisterInfo  *reg, uint64_t val)
+static void convert_to_little_endian(uint8_t *buf, uint32_t val)
 {
-    printf("wrote sample to fifo\n");
+    for (int i = 0; i < 4; i++) {
+        buf[i] = (uint8_t) (val & 0xff);
+        val >>= 8;
+    }
+}
+
+static int wav_init(XlnxAXIFIFO* fifo)
+{
+    uint8_t hdr[] = {
+        0x52, 0x49, 0x46, 0x46, 0x00, 0x00, 0x00, 0x00, 0x57, 0x41, 0x56,
+        0x45, 0x66, 0x6d, 0x74, 0x20, 0x10, 0x00, 0x00, 0x00, 0x01, 0x00,
+        0x02, 0x00, 0x11, 0x2B, 0x00, 0x00, 0x10, 0xb1, 0x02, 0x00, 0x04,
+        0x00, 0x10, 0x00, 0x64, 0x61, 0x74, 0x61, 0x00, 0x00, 0x00, 0x00
+    };
+
+    fifo->wavefile = fopen("qemu.wav", "wb");
+    if (!fifo->wavefile) {
+        printf("Failed to open wave file: %s\n", strerror(errno));
+        return -1;
+    }
+
+    fwrite(hdr, sizeof (hdr), 1, fifo->wavefile);
+
+    return 0;
+}
+
+static void write_sample_to_wav(RegisterInfo *reg, uint64_t val)
+{
+    XlnxAXIFIFO *s = XLNX_AXI_FIFO(reg->opaque);
+
+    // Create wavefile if not initialized
+    if (!s->wavefile) {
+        if (wav_init(s) < 0) {
+            return;
+        }
+    }
+    
+    // Write the 16-bit sample to the wavefile in little endian format
+    uint8_t* bytes = (uint8_t*) &val;
+    fwrite(bytes + 2, sizeof(uint8_t), 1, s->wavefile);
+    fwrite(bytes + 3, sizeof(uint8_t), 1, s->wavefile);
+    s->samples_written++;
+}
+
+static void close_wav_file(RegisterInfo *reg, uint64_t val)
+{
+    XlnxAXIFIFO *s = XLNX_AXI_FIFO(reg->opaque);
+    uint8_t total_len[4];
+    uint8_t data_len[4];
+
+    // If the wavefile was not created yet, don't do anything
+    if (!s->wavefile) {
+        return;
+    }
+
+    // Write the file and data length to the header
+    convert_to_little_endian(data_len, s->samples_written * 2);
+    convert_to_little_endian(total_len, s->samples_written * 2 + 36);
+    fseek(s->wavefile, 4, SEEK_SET);
+    fwrite(total_len, sizeof(uint32_t), 1, s->wavefile);
+    fseek(s->wavefile, 32, SEEK_CUR);
+    fwrite(data_len, sizeof(uint32_t), 1, s->wavefile);
+
+    // Close the file
+    fclose(s->wavefile);
+    s->wavefile = NULL;
 }
 
 static RegisterAccessInfo  xlnx_axi_fifo_regs_info[] = {
@@ -56,8 +124,9 @@ static RegisterAccessInfo  xlnx_axi_fifo_regs_info[] = {
     },{ .name = "TDFR",  .addr = A_TDFR,
     },{ .name = "TDFV",  .addr = A_TDFV,
     },{ .name = "TDFD",  .addr = A_TDFD,
-        .post_write = xlnx_axi_fifo_post_data_write,
+        .post_write = write_sample_to_wav,
     },{ .name = "TLR",  .addr = A_TLR,
+        .post_write = close_wav_file,
     },{ .name = "RDFR",  .addr = A_RDFR,
     },{ .name = "RDFO",  .addr = A_RDFO,
     },{ .name = "RDFD",  .addr = A_RDFD,
