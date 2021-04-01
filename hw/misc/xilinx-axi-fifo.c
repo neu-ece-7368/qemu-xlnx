@@ -107,6 +107,7 @@ static void close_wav_file(RegisterInfo *reg, uint64_t val)
     // Close the file
     fclose(s->wavefile);
     s->wavefile = NULL;
+    s->samples_written = 0;
 }
 
 static RegisterAccessInfo  xlnx_axi_fifo_regs_info[] = {
