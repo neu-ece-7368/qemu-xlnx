@@ -48,14 +48,6 @@ typedef struct XlnxAXIFIFO {
     FILE* wavefile;
 } XlnxAXIFIFO;
 
-static void convert_to_little_endian(uint8_t *buf, uint32_t val)
-{
-    for (int i = 0; i < 4; i++) {
-        buf[i] = (uint8_t) (val & 0xff);
-        val >>= 8;
-    }
-}
-
 static int wav_init(XlnxAXIFIFO* fifo)
 {
     uint8_t hdr[] = {
@@ -97,8 +89,6 @@ static void write_sample_to_wav(RegisterInfo *reg, uint64_t val)
 static void close_wav_file(RegisterInfo *reg, uint64_t val)
 {
     XlnxAXIFIFO *s = XLNX_AXI_FIFO(reg->opaque);
-    uint8_t total_len[4];
-    uint8_t data_len[4];
 
     // If the wavefile was not created yet, don't do anything
     if (!s->wavefile) {
@@ -106,12 +96,13 @@ static void close_wav_file(RegisterInfo *reg, uint64_t val)
     }
 
     // Write the file and data length to the header
-    convert_to_little_endian(data_len, s->samples_written * 2);
-    convert_to_little_endian(total_len, s->samples_written * 2 + 36);
+    uint32_t data_len = s->samples_written * 2;
+    uint32_t total_len = data_len + 36;
+
     fseek(s->wavefile, 4, SEEK_SET);
-    fwrite(total_len, sizeof(uint32_t), 1, s->wavefile);
+    fwrite(&total_len, sizeof(uint32_t), 1, s->wavefile);
     fseek(s->wavefile, 32, SEEK_CUR);
-    fwrite(data_len, sizeof(uint32_t), 1, s->wavefile);
+    fwrite(&data_len, sizeof(uint32_t), 1, s->wavefile);
 
     // Close the file
     fclose(s->wavefile);
