@@ -328,6 +328,9 @@ static void xilinx_timer_class_init(ObjectClass *klass, void *data)
 
     dc->realize = xilinx_timer_realize;
     device_class_set_props(dc, xilinx_timer_properties);
+    
+    zedmon_register_peripheral(ZEDMON_EVENT_CLASS_TIMER, "AXITIMER",
+                               NULL, NULL);
 }
 
 static const TypeInfo xilinx_timer_info = {

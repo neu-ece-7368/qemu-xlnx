@@ -28,6 +28,7 @@ class ZEvtClient(StoppableThread):
         socket = context.socket(zmq.SUB)
         socket.connect(self._srv_address)
         socket.setsockopt_string(zmq.SUBSCRIBE, 'GPIO')
+        socket.setsockopt_string(zmq.SUBSCRIBE, 'TIMER')
         self._logger.debug('event client started')
 
         while True:
@@ -37,7 +38,7 @@ class ZEvtClient(StoppableThread):
 
             try:
                 evt_str = socket.recv_string(flags=zmq.NOBLOCK)
-
+                self._logger.debug(evt_str)
                 m = self._GPIO_EVT_REGEX.match(evt_str)
                 if m is not None:
                     # gpio event

@@ -10,7 +10,7 @@
 
 #define PERIPHERAL_LABEL_SIZE 32
 
-static const char* EVENT_CLASS_NAMES[] = {"GPIO"};
+static const char* EVENT_CLASS_NAMES[] = {"GPIO", "TIMER"};
 
 typedef struct ZPeripheral {
     unsigned char pType;
@@ -216,6 +216,7 @@ static void parse_zedmon_cmd(char* cmdstr, void* responder)
         }
         else
         {
+            printf("parse_zedmon_cmd in error\n");
             //error
             return;
         }
@@ -269,6 +270,19 @@ static int evt_to_publisher_string(evtWrapper *evt, char *destBuf)
                         "UNKNOWN",
                         (unsigned int)((long int)gEvt->data));
     }
+    if (evt->evtType == ZEDMON_EVENT_CLASS_TIMER)
+    {
+        printf("identified timer event\n");
+        TimerEvent* gEvt = (TimerEvent*)evt->evtData;
+        int numChars = snprintf(destBuf, PUBLISHER_STRING_SIZE, "EVENT %s DATA 0x%08x\n",
+                        (gEvt->type == TIMER_EVT_DUTY) ? "DUTY" : "UNKNOWN",
+                        (unsigned int)((long int)gEvt->data));
+        printf("numChars: %d\n", numChars);
+        for(int i = 0; i < 27; i++) {
+            printf("%c", destBuf[i]);
+        }
+        return numChars;
+    }
 
     //unknown event type
     return -1;
@@ -305,7 +319,8 @@ static void* zedmon_publish_loop(void* tArg)
                     //error
                     continue;
                 }
-                zmq_send(publisher, msgBuffer, ret, ZMQ_DONTWAIT);
+                int check = zmq_send(publisher, msgBuffer, ret, ZMQ_DONTWAIT);
+                printf("check: %d\n", check);
 
                 //check flags
                 if (evt->evtFlags & ZEDMON_EVENT_FLAG_DESTROY)
@@ -344,6 +359,7 @@ int zedmon_notify_event(unsigned char evtType, void* evtData, unsigned int evtFl
     w->evtType = evtType;
     w->evtData = evtData;
     w->evtFlags = evtFlags;
+    printf("calling zedmon notify event\n");
 
     return mQueuePush(&externalComm.boardEvents, (void*)w);
 }
