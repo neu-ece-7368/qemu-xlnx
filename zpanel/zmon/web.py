@@ -66,6 +66,9 @@ class ZWebInterface:
                         self._led_state = evt_desc['data']
                         self._logger.debug('setting LED state to {}'
                                            .format(self._led_state))
+        if evt_desc['type'] == 'timer':
+            self._logger.debug(evt_desc)
+        # TODO: parsing here 
 
     def index(self):
         """Return main and only page."""

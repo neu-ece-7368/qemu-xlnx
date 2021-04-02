@@ -14,6 +14,8 @@ class ZEvtClient(StoppableThread):
     _GPIO_EVT_REGEX = re.compile(
         r'GPIO\s+([0-9]+)\s+CHANNEL\s+([0-9]+)\s+EVENT\s+([a-zA-Z0-9]+)\s+'
         r'DATA\s+([a-zA-Z0-9]+).*')
+    _TIMER_EVT_REGEX = re.compile(r'TIMER\s+EVENT\s+([a-zA-Z0-9]+)\s+'
+        r'DATA\s+([a-zA-Z0-9]+).*')
 
     def __init__(self, address, port, evt_callback=None):
         """Initialize."""
@@ -38,7 +40,6 @@ class ZEvtClient(StoppableThread):
 
             try:
                 evt_str = socket.recv_string(flags=zmq.NOBLOCK)
-                self._logger.debug(evt_str)
                 m = self._GPIO_EVT_REGEX.match(evt_str)
                 if m is not None:
                     # gpio event
@@ -49,6 +50,13 @@ class ZEvtClient(StoppableThread):
                              'channel': int(m.group(2)),
                              'event': m.group(3),
                              'data': int(m.group(4).split('0x')[1], 16)})
+                m = self._TIMER_EVT_REGEX.match(evt_str)
+                if m is not None:
+                    if self._evt_cb is not None:
+                        self._evt_cb(
+                            {'type': 'timer',
+                             'event': m.group(1),
+                             'data': int(m.group(2).split('0x')[1], 16)})
 
             except zmq.ZMQError:
                 pass

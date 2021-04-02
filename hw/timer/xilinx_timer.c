@@ -162,7 +162,6 @@ static int create_timer_duty_event(uint64_t duty_cycle) {
     evt->type = TIMER_EVT_DUTY;
     evt->data = (void*)duty_cycle;
     ret = zedmon_notify_event(ZEDMON_EVENT_CLASS_TIMER, evt, ZEDMON_EVENT_FLAG_DESTROY);
-    printf("sending duty cycle %llu\n", (uint64_t)evt->data);
     return ret;
 }
 
@@ -193,7 +192,6 @@ timer_write(void *opaque, hwaddr addr,
             xt->regs[addr] = value & 0x7ff;
             // enabling single timer
             if (value & TCSR_ENT) {
-                printf("single timer enabled");
                 ptimer_transaction_begin(xt->ptimer);
                 timer_enable(xt);
                 ptimer_transaction_commit(xt->ptimer);
@@ -211,7 +209,6 @@ timer_write(void *opaque, hwaddr addr,
             }
             // timer disabled 
             if (value & !TCSR_ENT) {
-                printf("single timer disabled\n");
                 uint64_t duty_cycle = 0;
                 ret = create_timer_duty_event(duty_cycle);
                 if(ret) { 
@@ -220,7 +217,6 @@ timer_write(void *opaque, hwaddr addr,
             }
             // enabling both timers 
             if (value & TCSR_ENALL) {
-                printf("enabling both timers\n");
                 struct xlx_timer *timer0 = &t->timers[0];
                 struct xlx_timer *timer1 = &t->timers[1];
                 ptimer_transaction_begin(timer0->ptimer);
@@ -240,13 +236,11 @@ timer_write(void *opaque, hwaddr addr,
             }
         break;
         case R_TLR:
-            printf("writing to R_TLR\n");
             xt->regs[addr] = value;
             struct xlx_timer *timer0 = &t->timers[0];
             struct xlx_timer *timer1 = &t->timers[1];
             // check that both timers are enabled
             if ((timer0->regs[R_TCSR] & TCSR_ENT) && (timer1->regs[R_TCSR] & TCSR_ENT)) {
-                printf("creating writing to R_TLR event");
                 uint64_t duty_cycle = 100 - (((float)((timer1->regs[R_TLR]) - (timer0->regs[R_TLR])))/1000.0);
                 ret = create_timer_duty_event(duty_cycle);
                 if(ret) {
