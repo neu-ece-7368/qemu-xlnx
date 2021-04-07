@@ -6,11 +6,6 @@
 #include "qemu/osdep.h"
 #include "hw/sysbus.h"
 #include "hw/register.h"
-#include "migration/vmstate.h"
-#include "hw/qdev-properties.h"
-#include "qemu/bitops.h"
-#include "qemu/log.h"
-#include "hw/irq.h"
 #include "qemu/timer.h"
 
 #ifndef XLNX_AXI_FIFO_ERR_DEBUG
