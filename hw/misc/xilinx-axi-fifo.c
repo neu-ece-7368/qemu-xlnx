@@ -11,6 +11,7 @@
 #include "qemu/bitops.h"
 #include "qemu/log.h"
 #include "hw/irq.h"
+#include "qemu/timer.h"
 
 #ifndef XLNX_AXI_FIFO_ERR_DEBUG
 #define XLNX_AXI_FIFO_ERR_DEBUG 0
@@ -37,6 +38,11 @@ REG32(RDR, 0x30)
 
 #define R_MAX (R_RDR + 1)
 
+// Sampling frequency is 11025 Hz
+#define TIME_PER_SAMPLE_NS 90703
+
+#define FIFO_DEPTH 4096
+
 typedef struct XlnxAXIFIFO {
     SysBusDevice parent_obj;
     MemoryRegion iomem;
@@ -45,7 +51,9 @@ typedef struct XlnxAXIFIFO {
     RegisterInfo regs_info[R_MAX];
 
     unsigned int samples_written;
+    unsigned int samples_read;
     FILE* wavefile;
+    int64_t time_check;
 } XlnxAXIFIFO;
 
 static int wav_init(XlnxAXIFIFO* fifo)
@@ -64,6 +72,8 @@ static int wav_init(XlnxAXIFIFO* fifo)
     }
 
     fwrite(hdr, sizeof (hdr), 1, fifo->wavefile);
+    
+    fifo->time_check = qemu_clock_get_ns(QEMU_CLOCK_HOST);
 
     return 0;
 }
@@ -110,11 +120,41 @@ static void close_wav_file(RegisterInfo *reg, uint64_t val)
     s->samples_written = 0;
 }
 
+static uint64_t get_num_samples_in_fifo(XlnxAXIFIFO *s)
+{
+    uint64_t now = qemu_clock_get_ns(QEMU_CLOCK_HOST);
+    unsigned int read = (now - s->time_check) / TIME_PER_SAMPLE_NS;
+
+    // Can't read more samples than written
+    if (s->samples_read + read >= s->samples_written) {
+        s->samples_read = s->samples_written;
+        // Reset the time when the fifo is empty
+        s->time_check = now;
+        return 0;
+    }
+
+    return s->samples_written - (s->samples_read + read);
+}
+
+static uint64_t get_fifo_vacancy(RegisterInfo *reg, uint64_t val)
+{
+    XlnxAXIFIFO *s = XLNX_AXI_FIFO(reg->opaque);
+
+    uint64_t samples_in_fifo = get_num_samples_in_fifo(s);
+
+    if (samples_in_fifo < FIFO_DEPTH) {
+        return FIFO_DEPTH - samples_in_fifo;
+    } else {
+        return 0;
+    }
+}
+
 static RegisterAccessInfo  xlnx_axi_fifo_regs_info[] = {
     {   .name = "ISR",  .addr = A_ISR,
     },{ .name = "IER",  .addr = A_IER,
     },{ .name = "TDFR",  .addr = A_TDFR,
     },{ .name = "TDFV",  .addr = A_TDFV,
+        .post_read = get_fifo_vacancy,
     },{ .name = "TDFD",  .addr = A_TDFD,
         .post_write = write_sample_to_wav,
     },{ .name = "TLR",  .addr = A_TLR,
