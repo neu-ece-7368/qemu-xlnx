@@ -46,9 +46,8 @@ typedef struct XlnxAXIFIFO {
     RegisterInfo regs_info[R_MAX];
 
     unsigned int samples_written;
-    unsigned int samples_read;
     FILE* wavefile;
-    int64_t time_check;
+    int64_t start_time;
 } XlnxAXIFIFO;
 
 static int wav_init(XlnxAXIFIFO* fifo)
@@ -68,9 +67,17 @@ static int wav_init(XlnxAXIFIFO* fifo)
 
     fwrite(hdr, sizeof (hdr), 1, fifo->wavefile);
     
-    fifo->time_check = qemu_clock_get_ns(QEMU_CLOCK_HOST);
+    fifo->start_time = qemu_clock_get_ns(QEMU_CLOCK_HOST);
 
     return 0;
+}
+
+static int get_num_samples_in_fifo(XlnxAXIFIFO *s)
+{
+    uint64_t now = qemu_clock_get_ns(QEMU_CLOCK_HOST);
+    unsigned int read = (now - s->start_time) / TIME_PER_SAMPLE_NS;
+
+    return s->samples_written - read;
 }
 
 static void write_sample_to_wav(RegisterInfo *reg, uint64_t val)
@@ -82,6 +89,22 @@ static void write_sample_to_wav(RegisterInfo *reg, uint64_t val)
         if (wav_init(s) < 0) {
             return;
         }
+    }
+
+    int samples_in_fifo = get_num_samples_in_fifo(s);
+
+    // Check for overflow
+    if (samples_in_fifo >= FIFO_DEPTH) {
+        // Drop sample
+        return;
+    }
+
+    // Check for underflow
+    for (int i = samples_in_fifo; i < 0; i++) {
+        // Write zeros to file
+        uint16_t sample = 0;
+        fwrite(&sample, sizeof(uint16_t), 1, s->wavefile);
+        s->samples_written++;
     }
     
     // Write the 16-bit sample to the wavefile in little endian format
@@ -115,29 +138,15 @@ static void close_wav_file(RegisterInfo *reg, uint64_t val)
     s->samples_written = 0;
 }
 
-static uint64_t get_num_samples_in_fifo(XlnxAXIFIFO *s)
-{
-    uint64_t now = qemu_clock_get_ns(QEMU_CLOCK_HOST);
-    unsigned int read = (now - s->time_check) / TIME_PER_SAMPLE_NS;
-
-    // Can't read more samples than written
-    if (s->samples_read + read >= s->samples_written) {
-        s->samples_read = s->samples_written;
-        // Reset the time when the fifo is empty
-        s->time_check = now;
-        return 0;
-    }
-
-    return s->samples_written - (s->samples_read + read);
-}
-
 static uint64_t get_fifo_vacancy(RegisterInfo *reg, uint64_t val)
 {
     XlnxAXIFIFO *s = XLNX_AXI_FIFO(reg->opaque);
 
-    uint64_t samples_in_fifo = get_num_samples_in_fifo(s);
+    int samples_in_fifo = get_num_samples_in_fifo(s);
 
-    if (samples_in_fifo < FIFO_DEPTH) {
+    if (samples_in_fifo < 0) {
+        return FIFO_DEPTH;
+    } else if (samples_in_fifo < FIFO_DEPTH) {
         return FIFO_DEPTH - samples_in_fifo;
     } else {
         return 0;
