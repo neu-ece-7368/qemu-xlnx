@@ -153,10 +153,31 @@ static uint64_t get_fifo_vacancy(RegisterInfo *reg, uint64_t val)
     }
 }
 
+static void reset_wav_file(RegisterInfo *reg, uint64_t val)
+{
+    // Check for 0xA5
+    if (val != 0xA5) {
+        return;
+    }
+
+    XlnxAXIFIFO *s = XLNX_AXI_FIFO(reg->opaque);
+
+    // If the wavefile was not created yet, don't do anything
+    if (!s->wavefile) {
+        return;
+    }
+
+    // Close the file
+    fclose(s->wavefile);
+    s->wavefile = NULL;
+    s->samples_written = 0;
+}
+
 static RegisterAccessInfo  xlnx_axi_fifo_regs_info[] = {
     {   .name = "ISR",  .addr = A_ISR,
     },{ .name = "IER",  .addr = A_IER,
     },{ .name = "TDFR",  .addr = A_TDFR,
+        .post_write = reset_wav_file,
     },{ .name = "TDFV",  .addr = A_TDFV,
         .post_read = get_fifo_vacancy,
     },{ .name = "TDFD",  .addr = A_TDFD,
