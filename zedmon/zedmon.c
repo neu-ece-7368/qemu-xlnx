@@ -10,7 +10,7 @@
 
 #define PERIPHERAL_LABEL_SIZE 32
 
-static const char* EVENT_CLASS_NAMES[] = {"GPIO", "TIMER"};
+static const char* EVENT_CLASS_NAMES[] = {"GPIO", "TIMER", "WAV"};
 
 typedef struct ZPeripheral {
     unsigned char pType;
@@ -276,6 +276,11 @@ static int evt_to_publisher_string(evtWrapper *evt, char *destBuf)
         return snprintf(destBuf, PUBLISHER_STRING_SIZE, "TIMER EVENT %s DATA 0x%08x\n",
                         (gEvt->type == TIMER_EVT_DUTY) ? "DUTY" : "UNKNOWN",
                         (unsigned int)((long int)gEvt->data));
+    }
+    if (evt->evtType == ZEDMON_EVENT_CLASS_WAV)
+    {
+        WAVEvent* gEvt = (WAVEvent*)evt->evtData;
+        return snprintf(destBuf, PUBLISHER_STRING_SIZE, "WAV %s\n", gEvt->filename);
     }
 
     //unknown event type

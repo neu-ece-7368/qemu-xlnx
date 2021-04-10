@@ -7,6 +7,7 @@
 #include "hw/sysbus.h"
 #include "hw/register.h"
 #include "qemu/timer.h"
+#include "zedmon/zedmon.h"
 
 #ifndef XLNX_AXI_FIFO_ERR_DEBUG
 #define XLNX_AXI_FIFO_ERR_DEBUG 0
@@ -32,6 +33,7 @@ REG32(TDR, 0x2C)
 REG32(RDR, 0x30)
 
 #define R_MAX (R_RDR + 1)
+#define WAVEFILE "qemu.wav"
 
 // Sampling frequency is 11025 Hz
 #define TIME_PER_SAMPLE_NS 90703
@@ -59,7 +61,7 @@ static int wav_init(XlnxAXIFIFO* fifo)
         0x00, 0x10, 0x00, 0x64, 0x61, 0x74, 0x61, 0x00, 0x00, 0x00, 0x00
     };
 
-    fifo->wavefile = fopen("qemu.wav", "wb");
+    fifo->wavefile = fopen(WAVEFILE, "wb");
     if (!fifo->wavefile) {
         printf("Failed to open wave file: %s\n", strerror(errno));
         return -1;
@@ -136,6 +138,13 @@ static void close_wav_file(RegisterInfo *reg, uint64_t val)
     fclose(s->wavefile);
     s->wavefile = NULL;
     s->samples_written = 0;
+
+    // Send event
+    WAVEvent* evt = (WAVEvent*)malloc(sizeof(WAVEvent));
+    getcwd(evt->filename, 1024);
+    strcat(evt->filename, "/");
+    strcat(evt->filename, WAVEFILE);
+    zedmon_notify_event(ZEDMON_EVENT_CLASS_WAV, evt, ZEDMON_EVENT_FLAG_DESTROY);
 }
 
 static uint64_t get_fifo_vacancy(RegisterInfo *reg, uint64_t val)
@@ -235,6 +244,8 @@ static void xlnx_axi_fifo_init(Object *obj)
                                 &reg_array->mem);
 
     sysbus_init_mmio(sbd, &s->iomem);
+
+    zedmon_register_peripheral(ZEDMON_EVENT_CLASS_WAV, "WAV", NULL, NULL);
 }
 
 static void xlnx_axi_fifo_class_init(ObjectClass *klass, void *data)

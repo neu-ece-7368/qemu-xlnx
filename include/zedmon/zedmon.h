@@ -4,6 +4,7 @@
 //event classes
 #define ZEDMON_EVENT_CLASS_GPIO 0x00
 #define ZEDMON_EVENT_CLASS_TIMER 0x01
+#define ZEDMON_EVENT_CLASS_WAV 0x02
 
 //errors
 #define ZEDMON_ERR_PERIPH_LIMIT -13
@@ -33,6 +34,10 @@ typedef struct TimerEvent {
     unsigned char type;
     void* data;
 } TimerEvent;
+
+typedef struct WAVEvent {
+    char filename[1024];
+} WAVEvent;
 
 //callback types
 typedef int (*ZedmonReadCallback)(unsigned int pIdx, unsigned int dIdx, void* data);
