@@ -77,6 +77,7 @@ struct timerblock
     struct xlx_timer *timers;
 };
 
+unsigned int tlr_read = 0;
 static inline unsigned int num_timers(struct timerblock *t)
 {
     return 2 - t->one_timer_only;
@@ -124,6 +125,9 @@ timer_read(void *opaque, hwaddr addr, unsigned int size)
                 D(qemu_log("xlx_timer t=%d read counter=%x udt=%d\n",
                          timer, r, xt->regs[R_TCSR] & TCSR_UDT));
             break;
+        case R_TLR:
+                tlr_read = 1;
+            break;
         default:
             if (addr < ARRAY_SIZE(xt->regs))
                 r = xt->regs[addr];
@@ -163,6 +167,23 @@ static int create_timer_duty_event(uint64_t duty_cycle) {
     evt->data = (void*)duty_cycle;
     ret = zedmon_notify_event(ZEDMON_EVENT_CLASS_TIMER, evt, ZEDMON_EVENT_FLAG_DESTROY);
     return ret;
+}
+
+static void on_capture(struct timerblock* inst) {
+    struct xlx_timer *xt;
+    xt = &(inst->timers[0]);
+    if(xt->regs[R_TCSR] & TCSR_CAPT) {
+        xt->regs[R_TCSR] |= TCSR_TINT;
+        if(xt->regs[R_TCSR] & TCSR_ARHT) {
+            xt->regs[R_TLR] = xt->regs[R_TCR]; 
+        } else {
+            if(tlr_read) {
+                xt->regs[R_TLR] = xt->regs[R_TCR]; 
+                tlr_read = 0;
+            }
+        }
+    timer_update_irq(inst);
+    }
 }
 
 static void
