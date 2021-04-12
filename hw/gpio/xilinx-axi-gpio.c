@@ -33,6 +33,7 @@
 #include "hw/irq.h"
 #include "zedmon/zedmon.h"
 #include <unistd.h>
+#include "qemu/timer.h"
 
 #ifndef XLNX_AXI_GPIO_ERR_DEBUG
 #define XLNX_AXI_GPIO_ERR_DEBUG 0
@@ -67,6 +68,10 @@ typedef struct XlnxAXIGPIO {
 
     uint32_t regs[R_MAX];
     RegisterInfo regs_info[R_MAX];
+    uint64_t rising_edge_time;
+    uint64_t falling_edge_time;
+    uint64_t duty_cycle;  // whole number 1-100
+    uint64_t period;
 } XlnxAXIGPIO;
 
 #define MAX_GPIOCHIP_COUNT 32
@@ -269,6 +274,8 @@ static uint64_t xlnx_axi_gpio_read(void *opaque, hwaddr addr, unsigned size)
 
     s = XLNX_AXI_GPIO(reg->opaque);
 
+    s->start_time = qemu_clock_get_ns(QEMU_CLOCK_HOST);
+
     // TODO: do something with s
 
     return register_read_memory(opaque, addr, size);
@@ -290,7 +297,8 @@ static void xlnx_axi_gpio_write(void *opaque, hwaddr addr,
         break;
       }
     }
-
+    
+    printf("GPIO value: %ld\n", value);
     register_write_memory(opaque, addr, value, size);
 
     if (!reg) {
@@ -298,6 +306,17 @@ static void xlnx_axi_gpio_write(void *opaque, hwaddr addr,
     }
 
     s = XLNX_AXI_GPIO(reg->opaque);
+
+    if (value == 1) {
+        // calculate time since last rising edge
+        int64_t now = qemu_clock_get_ns(QEMU_CLOCK_HOST);
+        s->period = now - s->start_time;
+        //  Might have to memcpy to be sure this casts correctly
+        s->duty_cycle = (uint64_t)((double)(s->falling_edge_time - s->rising_edge_time) / (double)s->period) * 100;
+        s->rising_edge_time = now; // for next period
+    } else if (value == 0) {
+        s->falling_edge_time = qemu_clock_get_ns(QEMU_CLOCK_HOST);
+    }
 
     //publish event
     evt = (GPIOEvent*)malloc(sizeof(GPIOEvent));
@@ -338,6 +357,8 @@ static void xlnx_axi_gpio_write(void *opaque, hwaddr addr,
 
     //set value
     evt->data = (void*)value;
+    evt->period = s->period;
+    evt->duty_cycle = s->duty_cycle;
     ret = find_axi_gpio_chip_number(s);
     if (ret < 0)
     {

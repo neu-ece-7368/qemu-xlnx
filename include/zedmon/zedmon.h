@@ -24,6 +24,8 @@ typedef struct GPIOEvent {
     unsigned char gpio_dev;
     unsigned char channel;
     void* data;
+    unsigned int period;
+    unsigned int duty_cycle;
 } GPIOEvent;
 
 //callback types
