@@ -115,7 +115,9 @@
 #include "sysemu/iothread.h"
 #include "qemu/guest-random.h"
 
+#ifdef CONFIG_ZMQ
 #include "zedmon/zedmon.h"
+#endif
 
 #define MAX_VIRTIO_CONSOLES 1
 
@@ -2867,7 +2869,9 @@ void qemu_init(int argc, char **argv, char **envp)
     error_init(argv[0]);
 
     // zedmon
+#ifdef CONFIG_ZMQ
     zedmon_init();
+#endif
 
     module_call_init(MODULE_INIT_TRACE);
 
