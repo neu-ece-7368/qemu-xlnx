@@ -31,7 +31,9 @@
 #include "qemu/bitops.h"
 #include "qemu/log.h"
 #include "hw/irq.h"
+#ifdef CONFIG_ZMQ
 #include "zedmon/zedmon.h"
+#endif
 #include <unistd.h>
 #include "qemu/timer.h"
 
@@ -719,9 +721,11 @@ static void xlnx_axi_gpio_class_init(ObjectClass *klass, void *data)
     memset(&gpioClass, 0, sizeof(XlnxAXIGPIOClass));
 
     //register
+#ifdef CONFIG_ZMQ
     zedmon_register_peripheral(ZEDMON_EVENT_CLASS_GPIO, "AXIGPIO",
                                xlnx_axi_gpio_read_from_monitor,
                                xlnx_axi_gpio_write_from_monitor);
+#endif
 }
 
 static const TypeInfo xlnx_axi_gpio_info = {

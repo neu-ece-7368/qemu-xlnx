@@ -156,7 +156,6 @@ endif #CONFIG_BSD_USER
 #########################################################
 # System emulator target
 ifdef CONFIG_SOFTMMU
-obj-y += zedmon/
 obj-y += softmmu/
 obj-y += gdbstub.o
 obj-y += hw/
@@ -182,6 +181,10 @@ endif
 generated-files-y += hmp-commands.h hmp-commands-info.h
 
 endif # CONFIG_SOFTMMU
+
+ifdef CONFIG_ZMQ
+obj-y += zedmon/
+endif
 
 dummy := $(call unnest-vars,,obj-y)
 all-obj-y := $(obj-y)
