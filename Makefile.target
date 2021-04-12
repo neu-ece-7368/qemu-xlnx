@@ -201,19 +201,19 @@ all-obj-y := $(obj-y)
 common-obj-m :=
 
 include $(SRC_PATH)/Makefile.objs
-dummy := $(call fix-paths,../,, \
-              authz-obj-y \
-              block-obj-y \
-              chardev-obj-y \
-              crypto-obj-y \
-              io-obj-y \
-              zedmon-obj-y \
-              qom-obj-y)
-dummy := $(call unnest-vars,..,common-obj-y)
+dummy := $(call unnest-vars,.., \
+               authz-obj-y \
+               block-obj-y \
+               block-obj-m \
+               chardev-obj-y \
+               crypto-obj-y \
+               qom-obj-y \
+               io-obj-y \
+               common-obj-y \
+               common-obj-m)
 all-obj-y += $(common-obj-y)
 all-obj-y += $(qom-obj-y)
 all-obj-$(CONFIG_SOFTMMU) += $(authz-obj-y)
-all-obj-y += $(zedmon-obj-y)
 all-obj-$(CONFIG_SOFTMMU) += $(block-obj-y) $(chardev-obj-y)
 all-obj-$(CONFIG_SOFTMMU) += $(crypto-obj-y)
 all-obj-$(CONFIG_SOFTMMU) += $(io-obj-y)
