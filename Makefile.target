@@ -192,13 +192,11 @@ dummy := $(call unnest-vars,.., \
                crypto-obj-y \
                qom-obj-y \
                io-obj-y \
-	             zedmon-obj-y \
                common-obj-y \
                common-obj-m)
 all-obj-y += $(common-obj-y)
 all-obj-y += $(qom-obj-y)
 all-obj-$(CONFIG_SOFTMMU) += $(authz-obj-y)
-all-obj-y += $(zedmon-obj-y)
 all-obj-$(CONFIG_SOFTMMU) += $(block-obj-y) $(chardev-obj-y)
 all-obj-$(CONFIG_SOFTMMU) += $(crypto-obj-y)
 all-obj-$(CONFIG_SOFTMMU) += $(io-obj-y)
