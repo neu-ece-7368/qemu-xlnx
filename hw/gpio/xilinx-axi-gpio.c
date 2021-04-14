@@ -70,7 +70,7 @@ typedef struct XlnxAXIGPIO {
     RegisterInfo regs_info[R_MAX];
     uint64_t rising_edge_time;
     uint64_t falling_edge_time;
-    uint64_t duty_cycle;  // whole number 1-100
+    uint64_t duty_cycle;  // whole number 1-1000
     uint64_t period;
 } XlnxAXIGPIO;
 
@@ -256,7 +256,7 @@ static void xlnx_axi_gpio_reset(DeviceState *dev)
 static uint64_t xlnx_axi_gpio_read(void *opaque, hwaddr addr, unsigned size)
 {
 
-    XlnxAXIGPIO *s = NULL;
+    //XlnxAXIGPIO *s = NULL;
     RegisterInfoArray *reg_array = opaque;
     RegisterInfo *reg = NULL;
     int i;
@@ -272,9 +272,10 @@ static uint64_t xlnx_axi_gpio_read(void *opaque, hwaddr addr, unsigned size)
         return -1;
     }
 
-    s = XLNX_AXI_GPIO(reg->opaque);
+    //s = XLNX_AXI_GPIO(reg->opaque);
 
-    s->start_time = qemu_clock_get_ns(QEMU_CLOCK_HOST);
+    // Just a placeholder
+    //s->rising_edge_time = qemu_clock_get_ns(QEMU_CLOCK_HOST);
 
     // TODO: do something with s
 
@@ -298,7 +299,6 @@ static void xlnx_axi_gpio_write(void *opaque, hwaddr addr,
       }
     }
     
-    printf("GPIO value: %ld\n", value);
     register_write_memory(opaque, addr, value, size);
 
     if (!reg) {
@@ -307,14 +307,17 @@ static void xlnx_axi_gpio_write(void *opaque, hwaddr addr,
 
     s = XLNX_AXI_GPIO(reg->opaque);
 
+    // Rising edge
     if (value == 1) {
         // calculate time since last rising edge
         int64_t now = qemu_clock_get_ns(QEMU_CLOCK_HOST);
-        s->period = now - s->start_time;
+        s->period = now - s->rising_edge_time; // in nanoseconds
         //  Might have to memcpy to be sure this casts correctly
-        s->duty_cycle = (uint64_t)((double)(s->falling_edge_time - s->rising_edge_time) / (double)s->period) * 100;
+        s->duty_cycle = (uint64_t)(((double)(s->falling_edge_time - s->rising_edge_time) / (double)(s->period)) * 1000);
         s->rising_edge_time = now; // for next period
+        
     } else if (value == 0) {
+        // faling edge
         s->falling_edge_time = qemu_clock_get_ns(QEMU_CLOCK_HOST);
     }
 
@@ -357,8 +360,8 @@ static void xlnx_axi_gpio_write(void *opaque, hwaddr addr,
 
     //set value
     evt->data = (void*)value;
-    evt->period = s->period;
-    evt->duty_cycle = s->duty_cycle;
+    evt->period = (void*)s->period;
+    evt->duty_cycle = (void*)s->duty_cycle;
     ret = find_axi_gpio_chip_number(s);
     if (ret < 0)
     {
