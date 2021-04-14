@@ -25,8 +25,6 @@ typedef struct GPIOEvent {
     unsigned char gpio_dev;
     unsigned char channel;
     void* data;
-    void* period;
-    void* duty_cycle;
 } GPIOEvent;
 
 #define TIMER_EVT_DUTY 0

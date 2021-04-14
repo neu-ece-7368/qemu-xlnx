@@ -169,7 +169,8 @@ static int create_timer_duty_event(uint64_t duty_cycle) {
     return ret;
 }
 
-static void on_capture(struct timerblock* inst) {
+/*static void 
+on_capture(struct timerblock* inst) {
     struct xlx_timer *xt;
     xt = &(inst->timers[0]);
     if(xt->regs[R_TCSR] & TCSR_CAPT) {
@@ -184,7 +185,7 @@ static void on_capture(struct timerblock* inst) {
         }
     timer_update_irq(inst);
     }
-}
+}*/
 
 static void
 timer_write(void *opaque, hwaddr addr,

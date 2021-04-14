@@ -315,7 +315,7 @@ static void xlnx_axi_gpio_write(void *opaque, hwaddr addr,
         //  Might have to memcpy to be sure this casts correctly
         s->duty_cycle = (uint64_t)(((double)(s->falling_edge_time - s->rising_edge_time) / (double)(s->period)) * 1000);
         s->rising_edge_time = now; // for next period
-        
+        // on_capture
     } else if (value == 0) {
         // faling edge
         s->falling_edge_time = qemu_clock_get_ns(QEMU_CLOCK_HOST);
@@ -359,9 +359,7 @@ static void xlnx_axi_gpio_write(void *opaque, hwaddr addr,
     }
 
     //set value
-    evt->data = (void*)value;
-    evt->period = (void*)s->period;
-    evt->duty_cycle = (void*)s->duty_cycle;
+    evt->data = (void*)s->duty_cycle;
     ret = find_axi_gpio_chip_number(s);
     if (ret < 0)
     {
