@@ -31,12 +31,14 @@ REG32(RLR, 0x24)
 REG32(SRR, 0x28)
 REG32(TDR, 0x2C)
 REG32(RDR, 0x30)
+REG32(TIDR, 0x34)
+REG32(TUSERR, 0x38)
+REG32(RIDR, 0x3C)
+REG32(RUSERR, 0x40)
+REG32(SFR, 0x44) // Sample Frequency Register
 
-#define R_MAX (R_RDR + 1)
+#define R_MAX (R_SFR + 1)
 #define WAVEFILE "qemu.wav"
-
-// Sampling frequency is 11025 Hz
-#define TIME_PER_SAMPLE_NS 90703
 
 #define FIFO_DEPTH 4096
 
@@ -57,9 +59,12 @@ static int wav_init(XlnxAXIFIFO* fifo)
     uint8_t hdr[] = {
         0x52, 0x49, 0x46, 0x46, 0x00, 0x00, 0x00, 0x00, 0x57, 0x41, 0x56,
         0x45, 0x66, 0x6d, 0x74, 0x20, 0x10, 0x00, 0x00, 0x00, 0x01, 0x00,
-        0x02, 0x00, 0x11, 0x2B, 0x00, 0x00, 0x10, 0xb1, 0x02, 0x00, 0x04,
+        0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0xb1, 0x02, 0x00, 0x04,
         0x00, 0x10, 0x00, 0x64, 0x61, 0x74, 0x61, 0x00, 0x00, 0x00, 0x00
     };
+
+    // Set the sample rate
+    *(uint32_t*)(hdr + 24) = fifo->regs[R_SFR]; 
 
     fifo->wavefile = fopen(WAVEFILE, "wb");
     if (!fifo->wavefile) {
@@ -76,8 +81,15 @@ static int wav_init(XlnxAXIFIFO* fifo)
 
 static int get_num_samples_in_fifo(XlnxAXIFIFO *s)
 {
+    unsigned int read = 0;
+
     uint64_t now = qemu_clock_get_ns(QEMU_CLOCK_HOST);
-    unsigned int read = (now - s->start_time) / TIME_PER_SAMPLE_NS;
+
+    // Only read if sample rate is not 0
+    if (s->regs[R_SFR]) {
+        uint32_t time_per_sample_ns = 1e9 / s->regs[R_SFR];
+        read = (now - s->start_time) / time_per_sample_ns;
+    } 
 
     return s->samples_written - read;
 }
@@ -200,6 +212,11 @@ static RegisterAccessInfo  xlnx_axi_fifo_regs_info[] = {
     },{ .name = "SRR",  .addr = A_SRR,
     },{ .name = "TDR",  .addr = A_TDR,
     },{ .name = "RDR",  .addr = A_RDR,
+    },{ .name = "TIDR",  .addr = A_TIDR,
+    },{ .name = "TUSERR",  .addr = A_TUSERR,
+    },{ .name = "RIDR",  .addr = A_RIDR,
+    },{ .name = "RUSERR",  .addr = A_RUSERR,
+    },{ .name = "SFR",  .addr = A_SFR,
     }
 };
 
