@@ -47,6 +47,12 @@ table.ledsw td {
 .red {
   background-color: #e74c3c;
 }
+.lightRed {
+  background-color: #d67a70;
+}
+.orange {
+  background-color: #e99f5a;
+}
 .feedback {
   font-size: 14px;
   color: #b1b1b1;
