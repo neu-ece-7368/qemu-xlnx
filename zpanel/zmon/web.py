@@ -71,7 +71,7 @@ class ZWebInterface:
                                            .format(self._led_value, self._led_duty_cycle))
         if evt_desc['type'] == 'timer':
             self._logger.debug(evt_desc)
-            if evt_desc['event'] == 'DUTY'
+            if evt_desc['event'] == 'DUTY':
                 self._led_state = evt_desc['data']
 
     def index(self):
@@ -90,7 +90,9 @@ class ZWebInterface:
 
     def _get_leds_state(self):
         # if direction is set to input then turn off
-        led_state = self._led_state
+        led_state = {}
+        led_state[0] = self._led_state
+        self._logger.debug(f"in get: {led_state}")
         return {'status': 'ok',
                 'data': led_state}
 
