@@ -55,13 +55,6 @@ FIELD(GIER, GIE, 31, 1) REG32(IP_ISR, 0x120) FIELD(IP_ISR, CHANNEL2_ST, 1, 1) FI
 #define R_MAX (R_IP_IER + 1)
 #define GPIO_MAX 8
 
-typedef struct XlixAXIGPIOComponent {
-    uint64_t rising_edge_time; // ns
-    uint64_t falling_edge_time; // ns
-    uint64_t duty_cycle;  // whole number 1-100
-    uint64_t period;
-} XlixAXIGPIOComponent;
-
     typedef struct XlnxAXIGPIO
 {
     SysBusDevice parent_obj;
@@ -72,7 +65,6 @@ typedef struct XlixAXIGPIOComponent {
 
     uint32_t regs[R_MAX];
     RegisterInfo regs_info[R_MAX];
-    XlixAXIGPIOComponent comps[GPIO_MAX];
     uint64_t rising_edge_time;
     uint64_t falling_edge_time;
     uint64_t duty_cycle; // whole number 1-1000

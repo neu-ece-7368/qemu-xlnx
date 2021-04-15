@@ -111,15 +111,11 @@ static void timer_update_irq(struct timerblock *t)
 
 extern void on_capture()
 {
-#ifdef DEBUG
-    printf("calling capture ");
-#endif
+    printf("calling capture");
     struct xlx_timer *xt = &(instance->timers[0]);
     if (xt->regs[R_TCSR] & TCSR_CAPT)
     {
-#ifdef DEBUG
-        printf("xt->regs[R_TCSR] & TCSR_CAPT ");
-#endif
+        printf("xt->regs[R_TCSR] & TCSR_CAPT");
         xt->regs[R_TCSR] |= TCSR_TINT;
         if (xt->regs[R_TCSR] & TCSR_ARHT)
         {
@@ -130,9 +126,7 @@ extern void on_capture()
         }
         else
         {
-#ifdef DEBUG
-            printf("in else ");
-#endif
+            printf("in else");
             if (tlr_read)
             {
 #ifdef DEBUG
