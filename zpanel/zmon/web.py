@@ -90,13 +90,9 @@ class ZWebInterface:
 
     def _get_leds_state(self):
         # if direction is set to input then turn off
-        # TODO this might need to be changed
-        led_state = self._led_value & ~self._led_dir_state
-        led_states = {}
-        for i in range(8):
-            led_states[i] = bool(led_state & (1 << i))
+        led_state = self._led_state
         return {'status': 'ok',
-                'data': led_states}
+                'data': led_state}
 
     def _set_sw_state(self):
         state = request.POST

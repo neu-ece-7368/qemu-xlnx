@@ -34,12 +34,20 @@
 
       function setLEDState(led, state)
       {
-      if (state) {
+      if (state >= 75) {
       $("#ledstate-"+led).addClass("red");
+      }
+      else if (state < 75 && state > 25) {
+      $("#ledstate-"+led).addClass("lightRed");
+      }
+      else if (state <= 25 && state > 0){
+      $("#ledstate-"+led).addClass("orange");
       }
       else
       {
       $("#ledstate-"+led).removeClass("red");
+      $("#ledstate-"+led).removeClass("lightRed");
+      $("#ledstate-"+led).removeClass("orange");
       }
       }
 
