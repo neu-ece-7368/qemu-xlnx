@@ -29,7 +29,6 @@
 #include "hw/qdev-properties.h"
 #include "qemu/log.h"
 #include "qemu/module.h"
-#include "qom/object.h"
 #include "zedmon/zedmon.h"
 
 #define D(x)
@@ -62,9 +61,9 @@ struct xlx_timer
     uint32_t regs[R_MAX];
 };
 
-#define TYPE_XILINX_TIMER "xlnx.xps-timer"
-DECLARE_INSTANCE_CHECKER(struct timerblock, XILINX_TIMER,
-                         TYPE_XILINX_TIMER)
+#define TYPE_XILINX_TIMER "esl.pulsecap"
+#define XILINX_TIMER(obj) \
+    OBJECT_CHECK(struct timerblock, (obj), TYPE_XILINX_TIMER)
 
 struct timerblock
 {
@@ -76,6 +75,8 @@ struct timerblock
     uint32_t freq_hz;
     struct xlx_timer *timers;
 };
+
+static struct timerblock *instance;
 
 static unsigned int tlr_read = 0;
 static inline unsigned int num_timers(struct timerblock *t)
@@ -104,10 +105,9 @@ static void timer_update_irq(struct timerblock *t)
     qemu_set_irq(t->irq, !!irq);
 }
 
-static void on_capture(struct timerblock *inst)
+extern void on_capture()
 {
-    struct xlx_timer *xt;
-    xt = &(inst->timers[0]);
+    struct xlx_timer *xt = &(instance->timers[0]);
     if (xt->regs[R_TCSR] & TCSR_CAPT)
     {
         xt->regs[R_TCSR] |= TCSR_TINT;
@@ -124,7 +124,7 @@ static void on_capture(struct timerblock *inst)
                 tlr_read = 0;
             }
         }
-        timer_update_irq(inst);
+        timer_update_irq(instance);
     }
 }
 
@@ -147,7 +147,6 @@ timer_read(void *opaque, hwaddr addr, unsigned int size)
         r = ptimer_get_count(xt->ptimer);
         if (!(xt->regs[R_TCSR] & TCSR_UDT))
             r = ~r;
-        on_capture(t);
         D(qemu_log("xlx_timer t=%d read counter=%x udt=%d\n",
                    timer, r, xt->regs[R_TCSR] & TCSR_UDT));
         break;
@@ -195,24 +194,6 @@ static int create_timer_duty_event(uint64_t duty_cycle)
     ret = zedmon_notify_event(ZEDMON_EVENT_CLASS_TIMER, evt, ZEDMON_EVENT_FLAG_DESTROY);
     return ret;
 }
-
-/*static void
-on_capture(struct timerblock* inst) {
-    struct xlx_timer *xt;
-    xt = &(inst->timers[0]);
-    if(xt->regs[R_TCSR] & TCSR_CAPT) {
-        xt->regs[R_TCSR] |= TCSR_TINT;
-        if(xt->regs[R_TCSR] & TCSR_ARHT) {
-            xt->regs[R_TLR] = xt->regs[R_TCR]; 
-        } else {
-            if(tlr_read) {
-                xt->regs[R_TLR] = xt->regs[R_TCR]; 
-                tlr_read = 0;
-            }
-        }
-    timer_update_irq(inst);
-    }
-}*/
 
 static void
 timer_write(void *opaque, hwaddr addr,
@@ -336,6 +317,7 @@ static void timer_hit(void *opaque)
 
 static void xilinx_timer_realize(DeviceState *dev, Error **errp)
 {
+    printf("calling xilinx_timer_realize");
     struct timerblock *t = XILINX_TIMER(dev);
     unsigned int i;
 
@@ -356,6 +338,7 @@ static void xilinx_timer_realize(DeviceState *dev, Error **errp)
     memory_region_init_io(&t->mmio, OBJECT(t), &timer_ops, t, "xlnx.xps-timer",
                           R_MAX * 4 * num_timers(t));
     sysbus_init_mmio(SYS_BUS_DEVICE(dev), &t->mmio);
+    instance = t;
 }
 
 static void xilinx_timer_init(Object *obj)
