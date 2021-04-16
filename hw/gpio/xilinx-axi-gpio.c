@@ -39,23 +39,18 @@
 #define XLNX_AXI_GPIO_ERR_DEBUG 0
 #endif
 
+extern void on_capture(void);
 #define TYPE_XLNX_AXI_GPIO "xlnx.axi-gpio"
 
 #define XLNX_AXI_GPIO(obj) \
-     OBJECT_CHECK(XlnxAXIGPIO, (obj), TYPE_XLNX_AXI_GPIO)
+    OBJECT_CHECK(XlnxAXIGPIO, (obj), TYPE_XLNX_AXI_GPIO)
 
 REG32(GPIO_DATA, 0x00)
 REG32(GPIO_TRI, 0x04)
 REG32(GPIO2_DATA, 0x08)
 REG32(GPIO2_TRI, 0x0C)
 REG32(GIER, 0x11C)
-    FIELD(GIER, GIE, 31, 1)
-REG32(IP_ISR, 0x120)
-    FIELD(IP_ISR, CHANNEL2_ST, 1, 1)
-    FIELD(IP_ISR, CHANNEL1_ST, 0, 1)
-REG32(IP_IER, 0x128)
-    FIELD(IP_IER, CHANNEL2_EN, 1, 1)
-    FIELD(IP_IER, CHANNEL1_EN, 0, 1)
+FIELD(GIER, GIE, 31, 1) REG32(IP_ISR, 0x120) FIELD(IP_ISR, CHANNEL2_ST, 1, 1) FIELD(IP_ISR, CHANNEL1_ST, 0, 1) REG32(IP_IER, 0x128) FIELD(IP_IER, CHANNEL2_EN, 1, 1) FIELD(IP_IER, CHANNEL1_EN, 0, 1)
 
 #define R_MAX (R_IP_IER + 1)
 #define GPIO_MAX 8
@@ -67,7 +62,8 @@ typedef struct XlixAXIGPIOComponent {
     uint64_t period;
 } XlixAXIGPIOComponent;
 
-typedef struct XlnxAXIGPIO {
+    typedef struct XlnxAXIGPIO
+{
     SysBusDevice parent_obj;
     MemoryRegion iomem;
 
@@ -77,28 +73,33 @@ typedef struct XlnxAXIGPIO {
     uint32_t regs[R_MAX];
     RegisterInfo regs_info[R_MAX];
     XlixAXIGPIOComponent comps[GPIO_MAX];
-    
+    uint64_t rising_edge_time;
+    uint64_t falling_edge_time;
+    uint64_t duty_cycle; // whole number 1-1000
+    uint64_t period;
 } XlnxAXIGPIO;
 
 #define MAX_GPIOCHIP_COUNT 32
-typedef struct XlnxAXIGPIOClass {
+typedef struct XlnxAXIGPIOClass
+{
     unsigned int chip_count;
-    XlnxAXIGPIO* chips[MAX_GPIOCHIP_COUNT];
+    XlnxAXIGPIO *chips[MAX_GPIOCHIP_COUNT];
 } XlnxAXIGPIOClass;
 
 static XlnxAXIGPIOClass gpioClass;
 
-static int find_axi_gpio_chip_number(XlnxAXIGPIO* s)
+static int find_axi_gpio_chip_number(XlnxAXIGPIO *s)
 {
     unsigned int chips = gpioClass.chip_count;
 
-    while(chips > 0)
+    while (chips > 0)
     {
-        if (gpioClass.chips[chips-1] == s)
+        if (gpioClass.chips[chips - 1] == s)
         {
             return chips;
         }
-        chips--;;
+        chips--;
+        ;
     }
 
     return -1;
@@ -123,14 +124,16 @@ static void data_handler(void *opaque, int irq, int level, int channel)
     tri_regnr = channel == 1 ? R_GPIO_TRI : R_GPIO2_TRI;
 
     if (!extract32(s->regs[tri_regnr], irq, 1) ||
-        extract32(s->regs[data_regnr], irq, 1) == level) {
+        extract32(s->regs[data_regnr], irq, 1) == level)
+    {
         /* GPIO is configured as output, or there is no change */
         return;
     }
 
     s->regs[data_regnr] = deposit32(s->regs[data_regnr], irq, 1, level);
 
-    switch (channel) {
+    switch (channel)
+    {
     case 1:
         ARRAY_FIELD_DP32(s->regs, IP_ISR, CHANNEL1_ST, 1);
         break;
@@ -162,8 +165,10 @@ static void xlnx_axi_gpio_data_post_write(XlnxAXIGPIO *s, uint64_t val,
     assert(channel > 0 && channel < 3);
     tri_regnr = channel == 1 ? R_GPIO_TRI : R_GPIO2_TRI;
 
-    for (i = 0; i < 32; i++) {
-        if (extract32(s->regs[tri_regnr], i, 1)) {
+    for (i = 0; i < 32; i++)
+    {
+        if (extract32(s->regs[tri_regnr], i, 1))
+        {
             /* GPIO is configured as input, don't change anything */
             continue;
         }
@@ -171,7 +176,8 @@ static void xlnx_axi_gpio_data_post_write(XlnxAXIGPIO *s, uint64_t val,
         gpio_set = extract32(val, i, 1);
 
         //weird that you generate interrupts when they are outputs
-        switch (channel) {
+        switch (channel)
+        {
         case 1:
             qemu_set_irq(s->outputs1[i], gpio_set);
             break;
@@ -182,33 +188,34 @@ static void xlnx_axi_gpio_data_post_write(XlnxAXIGPIO *s, uint64_t val,
     }
 }
 
-static void xlnx_axi_gpio_data_post_write1(RegisterInfo  *reg, uint64_t val)
+static void xlnx_axi_gpio_data_post_write1(RegisterInfo *reg, uint64_t val)
 {
     XlnxAXIGPIO *s = XLNX_AXI_GPIO(reg->opaque);
 
     xlnx_axi_gpio_data_post_write(s, val, 1);
 }
 
-static void xlnx_axi_gpio_data_post_write2(RegisterInfo  *reg, uint64_t val)
+static void xlnx_axi_gpio_data_post_write2(RegisterInfo *reg, uint64_t val)
 {
     XlnxAXIGPIO *s = XLNX_AXI_GPIO(reg->opaque);
 
     xlnx_axi_gpio_data_post_write(s, val, 2);
 }
 
-static void xlnx_axi_gpio_post_write(RegisterInfo  *reg, uint64_t val)
+static void xlnx_axi_gpio_post_write(RegisterInfo *reg, uint64_t val)
 {
     XlnxAXIGPIO *s = XLNX_AXI_GPIO(reg->opaque);
 
     irq_update(s);
 }
 
-static uint64_t xlnx_axi_gpi_data_read(RegisterInfo  *reg, uint64_t val,
+static uint64_t xlnx_axi_gpi_data_read(RegisterInfo *reg, uint64_t val,
                                        uint8_t channel)
 {
     //XlnxAXIGPIO *s = XLNX_AXI_GPIO(reg->opaque);
 
-    switch (channel) {
+    switch (channel)
+    {
         //case 1:
         //    return val & s->regs[R_GPIO_TRI];
         //case 2:
@@ -218,40 +225,60 @@ static uint64_t xlnx_axi_gpi_data_read(RegisterInfo  *reg, uint64_t val,
     }
 }
 
-static uint64_t xlnx_axi_gpio_data_post_read(RegisterInfo  *reg, uint64_t val)
+static uint64_t xlnx_axi_gpio_data_post_read(RegisterInfo *reg, uint64_t val)
 {
     return xlnx_axi_gpi_data_read(reg, val, 1);
 }
 
-static uint64_t xlnx_axi_gpio2_data_post_read(RegisterInfo  *reg, uint64_t val)
+static uint64_t xlnx_axi_gpio2_data_post_read(RegisterInfo *reg, uint64_t val)
 {
     return xlnx_axi_gpi_data_read(reg, val, 2);
 }
 
-static RegisterAccessInfo  xlnx_axi_gpio_regs_info[] = {
-    {   .name = "GPIO_DATA",  .addr = A_GPIO_DATA,
+static RegisterAccessInfo xlnx_axi_gpio_regs_info[] = {
+    {
+        .name = "GPIO_DATA",
+        .addr = A_GPIO_DATA,
         .post_read = xlnx_axi_gpio_data_post_read,
         .post_write = xlnx_axi_gpio_data_post_write1,
-    },{ .name = "GPIO_TRI",  .addr = A_GPIO_TRI,
-    },{ .name = "GPIO2_DATA",  .addr = A_GPIO2_DATA,
+    },
+    {
+        .name = "GPIO_TRI",
+        .addr = A_GPIO_TRI,
+    },
+    {
+        .name = "GPIO2_DATA",
+        .addr = A_GPIO2_DATA,
         .post_read = xlnx_axi_gpio2_data_post_read,
         .post_write = xlnx_axi_gpio_data_post_write2,
-    },{ .name = "GPIO2_TRI",  .addr = A_GPIO2_TRI,
-    },{ .name = "GIER",  .addr = A_GIER,
+    },
+    {
+        .name = "GPIO2_TRI",
+        .addr = A_GPIO2_TRI,
+    },
+    {
+        .name = "GIER",
+        .addr = A_GIER,
         .post_write = xlnx_axi_gpio_post_write,
-    },{ .name = "IP_IER",  .addr = A_IP_IER,
+    },
+    {
+        .name = "IP_IER",
+        .addr = A_IP_IER,
         .post_write = xlnx_axi_gpio_post_write,
-    },{ .name = "IP_ISR",  .addr = A_IP_ISR,
+    },
+    {
+        .name = "IP_ISR",
+        .addr = A_IP_ISR,
         .post_write = xlnx_axi_gpio_post_write,
-    }
-};
+    }};
 
 static void xlnx_axi_gpio_reset(DeviceState *dev)
 {
     XlnxAXIGPIO *s = XLNX_AXI_GPIO(dev);
     unsigned int i;
 
-    for (i = 0; i < ARRAY_SIZE(s->regs_info); ++i) {
+    for (i = 0; i < ARRAY_SIZE(s->regs_info); ++i)
+    {
         register_reset(&s->regs_info[i]);
     }
 
@@ -267,14 +294,17 @@ static uint64_t xlnx_axi_gpio_read(void *opaque, hwaddr addr, unsigned size)
     RegisterInfo *reg = NULL;
     int i;
 
-    for (i = 0; i < reg_array->num_elements; i++) {
-      if (reg_array->r[i]->access->addr == addr) {
-        reg = reg_array->r[i];
-        break;
-      }
+    for (i = 0; i < reg_array->num_elements; i++)
+    {
+        if (reg_array->r[i]->access->addr == addr)
+        {
+            reg = reg_array->r[i];
+            break;
+        }
     }
 
-    if (!reg) {
+    if (!reg)
+    {
         return -1;
     }
 
@@ -298,21 +328,44 @@ static void xlnx_axi_gpio_write(void *opaque, hwaddr addr,
     int ret;
     int i;
 
-    for (i = 0; i < reg_array->num_elements; i++) {
-      if (reg_array->r[i]->access->addr == addr) {
-        reg = reg_array->r[i];
-        break;
-      }
+    for (i = 0; i < reg_array->num_elements; i++)
+    {
+        if (reg_array->r[i]->access->addr == addr)
+        {
+            reg = reg_array->r[i];
+            break;
+        }
     }
     
     register_write_memory(opaque, addr, value, size);
 
-    if (!reg) {
-       return;
+    if (!reg)
+    {
+        return;
     }
 
     s = XLNX_AXI_GPIO(reg->opaque);
 
+    // Rising edge
+    if (value == 1)
+    {
+        // calculate time since last rising edge
+        int64_t now = qemu_clock_get_ns(QEMU_CLOCK_HOST);
+        s->period = now - s->rising_edge_time; // in nanoseconds
+        //  Might have to memcpy to be sure this casts correctly
+        s->duty_cycle = 100 - (uint64_t)(((double)(s->falling_edge_time - s->rising_edge_time) / (double)(s->period)) * 100);
+        s->rising_edge_time = now; // for next period
+        printf("duty: %llu\n", s->duty_cycle);
+        on_capture();
+    }
+    else if (value == 0)
+    {
+        // faling edge
+        s->falling_edge_time = qemu_clock_get_ns(QEMU_CLOCK_HOST);
+    }
+
+    //publish event
+    evt = (GPIOEvent *)malloc(sizeof(GPIOEvent));
 
     // Rising edge
     int64_t now = qemu_clock_get_ns(QEMU_CLOCK_HOST);
@@ -382,30 +435,24 @@ static void xlnx_axi_gpio_write(void *opaque, hwaddr addr,
             return;
         }
 
-        
-        ret = find_axi_gpio_chip_number(s);
-        if (ret < 0)
-        {
-            //error
-            //return;
-            ret = 0xFF;
-        }
-        evt->gpio_dev = ret;
-
-        //publish
-        evt->value = index;
-        evt->data = (void*)s->comps[index].duty_cycle;
-        ret = zedmon_notify_event(ZEDMON_EVENT_CLASS_GPIO, evt,
-                                ZEDMON_EVENT_FLAG_DESTROY);
-        if(ret)
-        {
-            //error occurred
-        } else {
-            printf("Sent event\n");
-        }
+    //set value
+    evt->data = (void *)s->duty_cycle;
+    ret = find_axi_gpio_chip_number(s);
+    if (ret < 0)
+    {
+        //error
+        //return;
+        ret = 0xFF;
     }
-    
+    evt->gpio_dev = ret;
 
+    //publish
+    ret = zedmon_notify_event(ZEDMON_EVENT_CLASS_GPIO, evt,
+                              ZEDMON_EVENT_FLAG_DESTROY);
+    if (ret)
+    {
+        //error occurred
+    }
 }
 
 static const MemoryRegionOps xlnx_axi_gpio_ops = {
@@ -419,7 +466,7 @@ static const MemoryRegionOps xlnx_axi_gpio_ops = {
 };
 
 static int xlnx_axi_gpio_write_from_monitor(unsigned int pIdx,
-                                            unsigned int dIdx, void* data)
+                                            unsigned int dIdx, void *data)
 {
 
     if (!data)
@@ -432,13 +479,13 @@ static int xlnx_axi_gpio_write_from_monitor(unsigned int pIdx,
         return -1;
     }
 
-    xlnx_axi_gpio_write(gpioClass.chips[pIdx], dIdx, *(uint64_t*)data, 0);
+    xlnx_axi_gpio_write(gpioClass.chips[pIdx], dIdx, *(uint64_t *)data, 0);
 
     return 0;
 }
 
 static int xlnx_axi_gpio_read_from_monitor(unsigned int pIdx,
-                                           unsigned int dIdx, void* data)
+                                           unsigned int dIdx, void *data)
 {
     uint64_t regVal;
 
@@ -458,7 +505,7 @@ static int xlnx_axi_gpio_read_from_monitor(unsigned int pIdx,
     regVal = xlnx_axi_gpio_read(gpioClass.chips[pIdx], dIdx, 0);
 
     //set value
-    *(uint64_t*)data = regVal;
+    *(uint64_t *)data = regVal;
 
     return 0;
 }
@@ -470,7 +517,7 @@ static void xlnx_axi_gpio_init(Object *obj)
     RegisterInfoArray *reg_array;
 
     memory_region_init(&s->iomem, obj,
-                          TYPE_XLNX_AXI_GPIO, R_MAX * 4);
+                       TYPE_XLNX_AXI_GPIO, R_MAX * 4);
     reg_array =
         register_init_block32(DEVICE(obj), xlnx_axi_gpio_regs_info,
                               ARRAY_SIZE(xlnx_axi_gpio_regs_info),
@@ -502,11 +549,10 @@ static const VMStateDescription vmstate_gpio = {
     .version_id = 1,
     .minimum_version_id = 1,
     .minimum_version_id_old = 1,
-    .fields = (VMStateField[]) {
+    .fields = (VMStateField[]){
         VMSTATE_UINT32_ARRAY(regs, XlnxAXIGPIO, R_MAX),
         VMSTATE_END_OF_LIST(),
-    }
-};
+    }};
 
 static void xlnx_axi_gpio_class_init(ObjectClass *klass, void *data)
 {
@@ -525,10 +571,10 @@ static void xlnx_axi_gpio_class_init(ObjectClass *klass, void *data)
 }
 
 static const TypeInfo xlnx_axi_gpio_info = {
-    .name          = TYPE_XLNX_AXI_GPIO,
-    .parent        = TYPE_SYS_BUS_DEVICE,
+    .name = TYPE_XLNX_AXI_GPIO,
+    .parent = TYPE_SYS_BUS_DEVICE,
     .instance_size = sizeof(XlnxAXIGPIO),
-    .class_init    = xlnx_axi_gpio_class_init,
+    .class_init = xlnx_axi_gpio_class_init,
     .instance_init = xlnx_axi_gpio_init,
 };
 

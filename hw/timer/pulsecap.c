@@ -33,6 +33,8 @@
 
 #define D(x)
 
+#define DEBUG
+
 #define R_TCSR 0
 #define R_TLR 1
 #define R_TCR 2
@@ -100,27 +102,46 @@ static void timer_update_irq(struct timerblock *t)
         csr = t->timers[i].regs[R_TCSR];
         irq |= (csr & TCSR_TINT) && (csr & TCSR_ENIT);
     }
-    printf("triggering interrupt");
+#ifdef DEBUG
+    printf("triggering interrupt ");
+#endif
     /* All timers within the same slave share a single IRQ line.  */
     qemu_set_irq(t->irq, !!irq);
 }
 
 extern void on_capture()
 {
+#ifdef DEBUG
+    printf("calling capture ");
+#endif
     struct xlx_timer *xt = &(instance->timers[0]);
     if (xt->regs[R_TCSR] & TCSR_CAPT)
     {
+#ifdef DEBUG
+        printf("xt->regs[R_TCSR] & TCSR_CAPT ");
+#endif
         xt->regs[R_TCSR] |= TCSR_TINT;
         if (xt->regs[R_TCSR] & TCSR_ARHT)
         {
-            printf("writing R_TCR to R_TLR");
+#ifdef DEBUG
+            printf("writing R_TCR to R_TLR ");
+#endif
             xt->regs[R_TLR] = xt->regs[R_TCR];
         }
         else
         {
+#ifdef DEBUG
+            printf("in else ");
+#endif
             if (tlr_read)
             {
+#ifdef DEBUG
+                printf("tlr_read ");
+#endif
                 xt->regs[R_TLR] = xt->regs[R_TCR];
+#ifdef DEBUG
+                printf("%d\n", xt->regs[R_TLR]);
+#endif
                 tlr_read = 0;
             }
         }
@@ -317,7 +338,9 @@ static void timer_hit(void *opaque)
 
 static void xilinx_timer_realize(DeviceState *dev, Error **errp)
 {
+#ifdef DEBUG
     printf("calling xilinx_timer_realize");
+#endif
     struct timerblock *t = XILINX_TIMER(dev);
     unsigned int i;
 
