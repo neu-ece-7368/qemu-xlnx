@@ -79,6 +79,7 @@ struct timerblock
 };
 
 static struct timerblock *instance;
+static bool initialized = false;
 
 static unsigned int tlr_read = 0;
 static inline unsigned int num_timers(struct timerblock *t)
@@ -159,6 +160,9 @@ timer_read(void *opaque, hwaddr addr, unsigned int size)
     switch (addr)
     {
     case R_TCR:
+#ifdef DEBUG
+        printf("timer read TCR: %d ", r);
+#endif
         r = ptimer_get_count(xt->ptimer);
         if (!(xt->regs[R_TCSR] & TCSR_UDT))
             r = ~r;
@@ -352,10 +356,14 @@ static void xilinx_timer_realize(DeviceState *dev, Error **errp)
         ptimer_transaction_commit(xt->ptimer);
     }
 
-    memory_region_init_io(&t->mmio, OBJECT(t), &timer_ops, t, "xlnx.xps-timer",
+    memory_region_init_io(&t->mmio, OBJECT(t), &timer_ops, t, "esl.pulsecap",
                           R_MAX * 4 * num_timers(t));
     sysbus_init_mmio(SYS_BUS_DEVICE(dev), &t->mmio);
-    instance = t;
+    if (!initialized) {
+        instance = t;
+        initialized = true;
+    }
+    
 }
 
 static void xilinx_timer_init(Object *obj)

@@ -99,7 +99,6 @@ static void timer_update_irq(struct timerblock *t)
         csr = t->timers[i].regs[R_TCSR];
         irq |= (csr & TCSR_TINT) && (csr & TCSR_ENIT);
     }
-    printf("triggering interrupt");
     /* All timers within the same slave share a single IRQ line.  */
     qemu_set_irq(t->irq, !!irq);
 }
@@ -113,7 +112,6 @@ static void on_capture(struct timerblock *inst)
         xt->regs[R_TCSR] |= TCSR_TINT;
         if (xt->regs[R_TCSR] & TCSR_ARHT)
         {
-            printf("writing R_TCR to R_TLR");
             xt->regs[R_TLR] = xt->regs[R_TCR];
         }
         else
