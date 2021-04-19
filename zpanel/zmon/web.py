@@ -92,7 +92,6 @@ class ZWebInterface:
         # if direction is set to input then turn off
         led_state = {}
         led_state[0] = self._led_state
-        self._logger.debug(f"in get: {led_state}")
         return {'status': 'ok',
                 'data': led_state}
 
