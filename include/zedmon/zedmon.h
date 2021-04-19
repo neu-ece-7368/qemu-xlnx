@@ -36,7 +36,7 @@ typedef struct TimerEvent {
 } TimerEvent;
 
 typedef struct WAVEvent {
-    char filename[1024];
+    char filename[95];
 } WAVEvent;
 
 //callback types

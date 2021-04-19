@@ -7,6 +7,7 @@
 #include "hw/sysbus.h"
 #include "hw/register.h"
 #include "qemu/timer.h"
+#include "qemu/log.h"
 #include "zedmon/zedmon.h"
 
 #ifndef XLNX_AXI_FIFO_ERR_DEBUG
@@ -68,7 +69,7 @@ static int wav_init(XlnxAXIFIFO* fifo)
 
     fifo->wavefile = fopen(WAVEFILE, "wb");
     if (!fifo->wavefile) {
-        printf("Failed to open wave file: %s\n", strerror(errno));
+        qemu_log("Failed to open wave file: %s\n", strerror(errno));
         return -1;
     }
 
@@ -153,7 +154,7 @@ static void close_wav_file(RegisterInfo *reg, uint64_t val)
 
     // Send event
     WAVEvent* evt = (WAVEvent*)malloc(sizeof(WAVEvent));
-    getcwd(evt->filename, 1024);
+    getcwd(evt->filename, 95);
     strcat(evt->filename, "/");
     strcat(evt->filename, WAVEFILE);
     zedmon_notify_event(ZEDMON_EVENT_CLASS_WAV, evt, ZEDMON_EVENT_FLAG_DESTROY);
