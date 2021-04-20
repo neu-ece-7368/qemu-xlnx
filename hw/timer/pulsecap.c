@@ -110,6 +110,7 @@ static void timer_update_irq(struct timerblock *t)
 
 extern void on_capture(bool high)
 {
+    uint32_t r = 0;
     struct xlx_timer *xt;
     xt = &(instance->timers[!high]);
     if (xt->regs[R_TCSR] & TCSR_CAPT)
@@ -117,17 +118,19 @@ extern void on_capture(bool high)
         xt->regs[R_TCSR] |= TCSR_TINT;
         if (xt->regs[R_TCSR] & TCSR_ARHT)
         {
-            xt->regs[R_TLR] = xt->regs[R_TCR];
+            r = ptimer_get_count(xt->ptimer);
+            if (!(xt->regs[R_TCSR] & TCSR_UDT))
+                r = ~r;
+            xt->regs[R_TLR] = r;
         }
         else
         {
-#ifdef CAPTURE
-            printf("in else ");
-#endif
             if (tlr_read)
             {
-                printf("xt->regs[R_TCR]: %u ", xt->regs[R_TCR]);
-                xt->regs[R_TLR] = xt->regs[R_TCR];
+                r = ptimer_get_count(xt->ptimer);
+                if (!(xt->regs[R_TCSR] & TCSR_UDT))
+                    r = ~r;
+                xt->regs[R_TLR] = r;
 #ifdef CAPTURE
                 printf("xt->regs[R_TLR]: %d\n", xt->regs[R_TLR]);
 #endif
@@ -165,6 +168,8 @@ timer_read(void *opaque, hwaddr addr, unsigned int size)
         break;
     case R_TLR:
         tlr_read = 1;
+        if (addr < ARRAY_SIZE(xt->regs))
+            r = xt->regs[addr];
         break;
     default:
         if (addr < ARRAY_SIZE(xt->regs))
@@ -190,6 +195,7 @@ static void timer_enable(struct xlx_timer *xt)
     else
         count = ~0 - xt->regs[R_TLR];
     ptimer_set_limit(xt->ptimer, count, 1);
+    printf("count: %llu", count);
     ptimer_run(xt->ptimer, 1);
 }
 
