@@ -34,6 +34,7 @@
 #define D(x)
 
 #define DEBUG
+#define CAPTURE
 
 #define R_TCSR 0
 #define R_TLR 1
@@ -103,39 +104,32 @@ static void timer_update_irq(struct timerblock *t)
         csr = t->timers[i].regs[R_TCSR];
         irq |= (csr & TCSR_TINT) && (csr & TCSR_ENIT);
     }
-#ifdef DEBUG
-    printf("triggering interrupt ");
-#endif
     /* All timers within the same slave share a single IRQ line.  */
     qemu_set_irq(t->irq, !!irq);
 }
 
-extern void on_capture()
+extern void on_capture(bool high)
 {
-    printf("calling capture");
-    struct xlx_timer *xt = &(instance->timers[0]);
+    struct xlx_timer *xt;
+    xt = &(instance->timers[!high]);
     if (xt->regs[R_TCSR] & TCSR_CAPT)
     {
-        printf("xt->regs[R_TCSR] & TCSR_CAPT");
         xt->regs[R_TCSR] |= TCSR_TINT;
         if (xt->regs[R_TCSR] & TCSR_ARHT)
         {
-#ifdef DEBUG
-            printf("writing R_TCR to R_TLR ");
-#endif
             xt->regs[R_TLR] = xt->regs[R_TCR];
         }
         else
         {
-            printf("in else");
+#ifdef CAPTURE
+            printf("in else ");
+#endif
             if (tlr_read)
             {
-#ifdef DEBUG
-                printf("tlr_read ");
-#endif
+                printf("xt->regs[R_TCR]: %u ", xt->regs[R_TCR]);
                 xt->regs[R_TLR] = xt->regs[R_TCR];
-#ifdef DEBUG
-                printf("%d\n", xt->regs[R_TLR]);
+#ifdef CAPTURE
+                printf("xt->regs[R_TLR]: %d\n", xt->regs[R_TLR]);
 #endif
                 tlr_read = 0;
             }
@@ -228,6 +222,20 @@ timer_write(void *opaque, hwaddr addr,
     addr >>= 2;
     timer = timer_from_addr(addr);
     xt = &t->timers[timer];
+    bool wasEnabled;
+    bool oneTimerEnabled; 
+    uint32_t prevTCSR = xt->regs[R_TCSR];
+    if(prevTCSR & TCSR_ENALL) {
+        wasEnabled = true;
+    } else {
+        wasEnabled = false; 
+    }
+    if(prevTCSR & TCSR_ENT) {
+        oneTimerEnabled = true;
+    } else {
+        oneTimerEnabled = false;
+    }
+    printf("timer write xt->regs[R_TCR]: %u\n", xt->regs[R_TCR]);
     D(fprintf(stderr, "%s addr=%x val=%x (timer=%d off=%d)\n",
               __func__, addr * 4, value, timer, addr & 3));
     /* Further decoding to address a specific timers reg.  */
@@ -235,12 +243,13 @@ timer_write(void *opaque, hwaddr addr,
     switch (addr)
     {
     case R_TCSR:
+
         if (value & TCSR_TINT)
             value &= ~TCSR_TINT;
 
         xt->regs[addr] = value & 0x7ff;
         // enabling single timer
-        if (value & TCSR_ENT)
+        if ((value & TCSR_ENT) && !oneTimerEnabled)
         {
             ptimer_transaction_begin(xt->ptimer);
             timer_enable(xt);
@@ -270,8 +279,12 @@ timer_write(void *opaque, hwaddr addr,
             }
         }
         // enabling both timers
-        if (value & TCSR_ENALL)
+        if ((value & TCSR_ENALL) && !wasEnabled)
         {
+            #ifdef DEBUG
+            printf("enabling both timers");
+            #endif
+            t = instance;
             struct xlx_timer *timer0 = &t->timers[0];
             struct xlx_timer *timer1 = &t->timers[1];
             ptimer_transaction_begin(timer0->ptimer);

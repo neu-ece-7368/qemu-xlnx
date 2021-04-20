@@ -39,7 +39,7 @@
 #define XLNX_AXI_GPIO_ERR_DEBUG 0
 #endif
 
-extern void on_capture(void);
+extern void on_capture(bool);
 #define TYPE_XLNX_AXI_GPIO "xlnx.axi-gpio"
 
 #define XLNX_AXI_GPIO(obj) \
@@ -348,12 +348,14 @@ static void xlnx_axi_gpio_write(void *opaque, hwaddr addr,
         s->duty_cycle = 100 - (uint64_t)(((double)(s->falling_edge_time - s->rising_edge_time) / (double)(s->period)) * 100);
         s->rising_edge_time = now; // for next period
         printf("duty: %llu\n", s->duty_cycle);
-        on_capture();
+        on_capture(true);
     }
     else if (value == 0)
     {
         // faling edge
         s->falling_edge_time = qemu_clock_get_ns(QEMU_CLOCK_HOST);
+        on_capture(false);
+
     }
 
     //publish event
