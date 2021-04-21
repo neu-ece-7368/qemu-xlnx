@@ -58,6 +58,14 @@ REG32(IP_IER, 0x128)
     FIELD(IP_IER, CHANNEL1_EN, 0, 1)
 
 #define R_MAX (R_IP_IER + 1)
+#define GPIO_MAX 8
+
+typedef struct XlixAXIGPIOComponent {
+    uint64_t rising_edge_time; // ns
+    uint64_t falling_edge_time; // ns
+    uint64_t duty_cycle;  // whole number 1-100
+    uint64_t period;
+} XlixAXIGPIOComponent;
 
 typedef struct XlnxAXIGPIO {
     SysBusDevice parent_obj;
@@ -68,10 +76,8 @@ typedef struct XlnxAXIGPIO {
 
     uint32_t regs[R_MAX];
     RegisterInfo regs_info[R_MAX];
-    uint64_t rising_edge_time;
-    uint64_t falling_edge_time;
-    uint64_t duty_cycle;  // whole number 1-1000
-    uint64_t period;
+    XlixAXIGPIOComponent comps[GPIO_MAX];
+    
 } XlnxAXIGPIO;
 
 #define MAX_GPIOCHIP_COUNT 32
@@ -307,19 +313,34 @@ static void xlnx_axi_gpio_write(void *opaque, hwaddr addr,
 
     s = XLNX_AXI_GPIO(reg->opaque);
 
+
     // Rising edge
-    if (value == 1) {
-        // calculate time since last rising edge
-        int64_t now = qemu_clock_get_ns(QEMU_CLOCK_HOST);
-        s->period = now - s->rising_edge_time; // in nanoseconds
-        //  Might have to memcpy to be sure this casts correctly
-        s->duty_cycle = 100 - (uint64_t)(((double)(s->falling_edge_time - s->rising_edge_time) / (double)(s->period)) * 100);
-        s->rising_edge_time = now; // for next period
-        // on_capture
-    } else if (value == 0) {
-        // faling edge
-        s->falling_edge_time = qemu_clock_get_ns(QEMU_CLOCK_HOST);
-    }
+    int64_t now = qemu_clock_get_ns(QEMU_CLOCK_HOST);
+
+
+    uint8_t index;
+    for (index = 0; index < GPIO_MAX; index++) {
+        if (value & (1 << index)) {
+
+            // calculate time since last rising edge
+            uint64_t period =  now - s->comps[index].rising_edge_time; // in nanoseconds;
+                      
+            s->comps[index].rising_edge_time = now; // for next period
+
+            //  Might have to memcpy to be sure this casts correctly
+            uint64_t duty_cycle = 100 - (uint64_t)(((double)(s->comps[index].rising_edge_time - s->comps[index].falling_edge_time) / (double)(s->comps[index].period)) * 100.0);
+            uint64_t old_duty_cyle = s->comps[index].duty_cycle;
+
+            // Change if 5% duty cycle change
+            if (abs(old_duty_cyle - duty_cycle) > 5) {
+                s->comps[index].duty_cycle = duty_cycle;
+            }
+
+        } else {
+            // faling edge 
+            s->comps[index].falling_edge_time = now;
+        }
+    } 
 
     //publish event
     evt = (GPIOEvent*)malloc(sizeof(GPIOEvent));
@@ -358,8 +379,7 @@ static void xlnx_axi_gpio_write(void *opaque, hwaddr addr,
         return;
     }
 
-    //set value
-    evt->data = (void*)s->duty_cycle;
+    
     ret = find_axi_gpio_chip_number(s);
     if (ret < 0)
     {
@@ -370,12 +390,14 @@ static void xlnx_axi_gpio_write(void *opaque, hwaddr addr,
     evt->gpio_dev = ret;
 
     //publish
+   evt->data = (void*)s->comps[0].duty_cycle;
     ret = zedmon_notify_event(ZEDMON_EVENT_CLASS_GPIO, evt,
-                              ZEDMON_EVENT_FLAG_DESTROY);
+                            ZEDMON_EVENT_FLAG_DESTROY);
     if(ret)
     {
         //error occurred
     }
+    
 
 }
 
