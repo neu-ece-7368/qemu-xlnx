@@ -324,6 +324,7 @@ static void xlnx_axi_gpio_write(void *opaque, hwaddr addr,
 
             // calculate time since last rising edge
             uint64_t period =  now - s->comps[index].rising_edge_time; // in nanoseconds;
+            s->comps[index].period = period;
                       
             s->comps[index].rising_edge_time = now; // for next period
 
@@ -331,7 +332,7 @@ static void xlnx_axi_gpio_write(void *opaque, hwaddr addr,
             uint64_t duty_cycle = 100 - (uint64_t)(((double)(s->comps[index].rising_edge_time - s->comps[index].falling_edge_time) / (double)(s->comps[index].period)) * 100.0);
             uint64_t old_duty_cyle = s->comps[index].duty_cycle;
 
-            if (duty_cycle < 0) {
+            if (duty_cycle > 100) {
                 // if duty cycle is larger than 100, so issue or timed out, then set to zero
                 s->comps[index].duty_cycle = 0;
             } else if (abs(old_duty_cyle - duty_cycle) > 5) {
@@ -345,62 +346,63 @@ static void xlnx_axi_gpio_write(void *opaque, hwaddr addr,
             // faling edge 
             s->comps[index].falling_edge_time = now;
         }
-    } 
-
-    //publish event
-    evt = (GPIOEvent*)malloc(sizeof(GPIOEvent));
-
-    if (!evt)
-    {
-        return;
-    }
-
-    if (addr == 0x00 || addr == 0x08)
-    {
-        evt->type = GPIO_EVT_VALUE;
-        if (addr == 0x00)
-        {
-            evt->channel = 0;
-        }
-        else
-        {
-            evt->channel = 1;
-        }
-    }
-    else if (addr == 0x04 || addr == 0x0C)
-    {
-        evt->type = GPIO_EVT_DIRECTION;
-        if (addr == 0x04)
-        {
-            evt->channel = 0;
-        }
-        else
-        {
-            evt->channel = 1;
-        }
-    }
-    else
-    {
-        return;
-    }
-
     
-    ret = find_axi_gpio_chip_number(s);
-    if (ret < 0)
-    {
-        //error
-        //return;
-        ret = 0xFF;
-    }
-    evt->gpio_dev = ret;
 
-    //publish
-   evt->data = (void*)s->comps[0].duty_cycle;
-    ret = zedmon_notify_event(ZEDMON_EVENT_CLASS_GPIO, evt,
-                            ZEDMON_EVENT_FLAG_DESTROY);
-    if(ret)
-    {
-        //error occurred
+        //publish event
+        evt = (GPIOEvent*)malloc(sizeof(GPIOEvent));
+
+        if (!evt)
+        {
+            return;
+        }
+
+        if (addr == 0x00 || addr == 0x08)
+        {
+            evt->type = GPIO_EVT_VALUE;
+            if (addr == 0x00)
+            {
+                evt->channel = 0;
+            }
+            else
+            {
+                evt->channel = 1;
+            }
+        }
+        else if (addr == 0x04 || addr == 0x0C)
+        {
+            evt->type = GPIO_EVT_DIRECTION;
+            if (addr == 0x04)
+            {
+                evt->channel = 0;
+            }
+            else
+            {
+                evt->channel = 1;
+            }
+        }
+        else
+        {
+            return;
+        }
+
+        
+        ret = find_axi_gpio_chip_number(s);
+        if (ret < 0)
+        {
+            //error
+            //return;
+            ret = 0xFF;
+        }
+        evt->gpio_dev = ret;
+
+        //publish
+    evt->data = (void*)s->comps[0].duty_cycle;
+        ret = zedmon_notify_event(ZEDMON_EVENT_CLASS_GPIO, evt,
+                                ZEDMON_EVENT_FLAG_DESTROY);
+        if(ret)
+        {
+            //error occurred
+        }
     }
     
 
