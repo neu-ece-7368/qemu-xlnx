@@ -24,6 +24,7 @@ typedef struct GPIOEvent {
     unsigned char type;
     unsigned char gpio_dev;
     unsigned char channel;
+    unsigned int value;
     void* data;
 } GPIOEvent;
 

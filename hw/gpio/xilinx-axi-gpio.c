@@ -396,7 +396,8 @@ static void xlnx_axi_gpio_write(void *opaque, hwaddr addr,
         evt->gpio_dev = ret;
 
         //publish
-    evt->data = (void*)s->comps[0].duty_cycle;
+        evt->value = index;
+        evt->data = (void*)s->comps[index].duty_cycle;
         ret = zedmon_notify_event(ZEDMON_EVENT_CLASS_GPIO, evt,
                                 ZEDMON_EVENT_FLAG_DESTROY);
         if(ret)

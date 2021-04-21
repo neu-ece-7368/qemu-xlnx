@@ -36,8 +36,9 @@ class ZWebInterface:
 
         # store state
         self._led_dir_state = 0x00
-        self._led_state = 0x00
+        self._led_value = 0x00
         self._dip_state = 0x00
+        self._led_duty_cycle = 0
 
     def jsFiles(self, filename):
         """Retrieve .js files."""
@@ -63,9 +64,10 @@ class ZWebInterface:
                     if evt_desc['event'] == 'DIR':
                         self._led_dir_state = evt_desc['data']
                     elif evt_desc['event'] == 'VALUE':
-                        self._led_state = evt_desc['data']
+                        self._led_value = evt_desc['value']
+                        self._led_duty_cycle = evt_desc['data']
                         self._logger.debug('setting LED state to {}'
-                                           .format(self._led_state))
+                                           .format(self._led_value))
         if evt_desc['type'] == 'timer':
             self._logger.debug(evt_desc)
         # TODO: parsing here 
@@ -79,14 +81,15 @@ class ZWebInterface:
         pass
 
     def _recv_led_state(self, value):
-        self._led_state = value
+        self._led_value = value
 
     def _recv_led_dir(self, value):
         self._led_dir_state = value
 
     def _get_leds_state(self):
         # if direction is set to input then turn off
-        led_state = self._led_state & ~self._led_dir_state
+        # TODO this might need to be changed
+        led_state = self._led_value & ~self._led_dir_state
         led_states = {}
         for i in range(8):
             led_states[i] = bool(led_state & (1 << i))
