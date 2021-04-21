@@ -331,10 +331,15 @@ static void xlnx_axi_gpio_write(void *opaque, hwaddr addr,
             uint64_t duty_cycle = 100 - (uint64_t)(((double)(s->comps[index].rising_edge_time - s->comps[index].falling_edge_time) / (double)(s->comps[index].period)) * 100.0);
             uint64_t old_duty_cyle = s->comps[index].duty_cycle;
 
-            // Change if 5% duty cycle change
-            if (abs(old_duty_cyle - duty_cycle) > 5) {
+            if (duty_cycle < 0) {
+                // if duty cycle is larger than 100, so issue or timed out, then set to zero
+                s->comps[index].duty_cycle = 0;
+            } else if (abs(old_duty_cyle - duty_cycle) > 5) {
+                // Change if 5% duty cycle change
                 s->comps[index].duty_cycle = duty_cycle;
             }
+
+            
 
         } else {
             // faling edge 
