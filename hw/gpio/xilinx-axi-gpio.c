@@ -339,9 +339,6 @@ static void xlnx_axi_gpio_write(void *opaque, hwaddr addr,
                 // Change if 5% duty cycle change
                 s->comps[index].duty_cycle = duty_cycle;
             }
-
-            
-
         } else {
             // faling edge 
             s->comps[index].falling_edge_time = now;
@@ -403,6 +400,8 @@ static void xlnx_axi_gpio_write(void *opaque, hwaddr addr,
         if(ret)
         {
             //error occurred
+        } else {
+            printf("Sent event\n");
         }
     }
     

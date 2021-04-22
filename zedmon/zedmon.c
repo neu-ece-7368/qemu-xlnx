@@ -261,13 +261,14 @@ static int evt_to_publisher_string(evtWrapper *evt, char *destBuf)
     if (evt->evtType == ZEDMON_EVENT_CLASS_GPIO)
     {
         GPIOEvent* gEvt = (GPIOEvent*)evt->evtData;
-        return snprintf(destBuf, PUBLISHER_STRING_SIZE, "GPIO %d CHANNEL %d EVENT %s DATA 0x%08x\n",
+        return snprintf(destBuf, PUBLISHER_STRING_SIZE, "GPIO %d CHANNEL %d EVENT %s DATA %d VALUE %d\n",
                         gEvt->gpio_dev,
                         gEvt->channel,
                         (gEvt->type == GPIO_EVT_VALUE) ? "VALUE" :
                         (gEvt->type == GPIO_EVT_DIRECTION) ? "DIR" :
                         "UNKNOWN",
-                        (unsigned int)((long int)gEvt->data));
+                        (unsigned int)((long int)gEvt->data),
+                        (unsigned int)((long int)gEvt->value));
     }
     if (evt->evtType == ZEDMON_EVENT_CLASS_TIMER)
     {

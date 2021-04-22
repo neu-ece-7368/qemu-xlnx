@@ -36,7 +36,7 @@ class ZWebInterface:
 
         # store state
         self._led_dir_state = 0x00
-        self._led_value = 0x00
+        self._led_value = 0
         self._dip_state = 0x00
         self._led_duty_cycle = 0
 
@@ -58,6 +58,7 @@ class ZWebInterface:
 
     def register_event(self, evt_desc):
         """Event callback."""
+
         if evt_desc['type'] == 'gpio':
             if evt_desc['chip'] == self._LED_GPIOCHIP:
                 if evt_desc['channel'] == 0:
@@ -66,7 +67,7 @@ class ZWebInterface:
                     elif evt_desc['event'] == 'VALUE':
                         self._led_value = evt_desc['value']
                         self._led_duty_cycle = evt_desc['data']
-                        self._logger.debug('setting LED state to {}'
+                        self._logger.debug('setting LED {} state'
                                            .format(self._led_value))
         if evt_desc['type'] == 'timer':
             self._logger.debug(evt_desc)
@@ -139,4 +140,4 @@ class ZWebInterface:
         self._cli.get_gpio_dir(self._LED_GPIOCHIP, self._recv_led_dir)
 
         self._logger.debug('starting web interface')
-        run(host=self._bind_to, port=self._srv_port, server='cheroot')
+        run(server='cherrypy', host=self._bind_to, port=self._srv_port)

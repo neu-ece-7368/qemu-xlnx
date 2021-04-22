@@ -40,6 +40,7 @@ class ZEvtClient(StoppableThread):
 
             try:
                 evt_str = socket.recv_string(flags=zmq.NOBLOCK)
+                #self._logger.debug('got string: ', evt_str)
                 m = self._GPIO_EVT_REGEX.match(evt_str)
                 if m is not None:
                     # gpio event
@@ -49,8 +50,8 @@ class ZEvtClient(StoppableThread):
                              'chip': int(m.group(1)),
                              'channel': int(m.group(2)),
                              'event': m.group(3),
-                             'data': int(m.group(4),
-                             'value': int(m.group(5).split('0x')[1], 16))})
+                             'data': int(m.group(4)),
+                             'value': int(m.group(5))})  #int(m.group(5).split('0x')[1], 16)})
                 m = self._TIMER_EVT_REGEX.match(evt_str)
                 if m is not None:
                     if self._evt_cb is not None:
