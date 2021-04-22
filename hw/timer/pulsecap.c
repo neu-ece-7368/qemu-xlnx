@@ -109,6 +109,9 @@ static void timer_update_irq(struct timerblock *t)
 {
     uint32_t r = 0;
     struct xlx_timer *xt;
+    if(instance == NULL) {
+        return;
+    }
     xt = &(instance->timers[!high]);
     if (xt->regs[R_TCSR] & TCSR_CAPT)
     {
