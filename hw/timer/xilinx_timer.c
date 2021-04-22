@@ -34,22 +34,22 @@
 
 #define D(x)
 
-#define R_TCSR 0
-#define R_TLR 1
-#define R_TCR 2
-#define R_MAX 4
+#define R_TCSR     0
+#define R_TLR      1
+#define R_TCR      2
+#define R_MAX      4
 
-#define TCSR_MDT (1 << 0)
-#define TCSR_UDT (1 << 1)
-#define TCSR_GENT (1 << 2)
-#define TCSR_CAPT (1 << 3)
-#define TCSR_ARHT (1 << 4)
-#define TCSR_LOAD (1 << 5)
-#define TCSR_ENIT (1 << 6)
-#define TCSR_ENT (1 << 7)
-#define TCSR_TINT (1 << 8)
-#define TCSR_PWMA (1 << 9)
-#define TCSR_ENALL (1 << 10)
+#define TCSR_MDT        (1<<0)
+#define TCSR_UDT        (1<<1)
+#define TCSR_GENT       (1<<2)
+#define TCSR_CAPT       (1<<3)
+#define TCSR_ARHT       (1<<4)
+#define TCSR_LOAD       (1<<5)
+#define TCSR_ENIT       (1<<6)
+#define TCSR_ENT        (1<<7)
+#define TCSR_TINT       (1<<8)
+#define TCSR_PWMA       (1<<9)
+#define TCSR_ENALL      (1<<10)
 
 struct xlx_timer
 {
@@ -77,7 +77,6 @@ struct timerblock
     struct xlx_timer *timers;
 };
 
-static unsigned int tlr_read = 0;
 static inline unsigned int num_timers(struct timerblock *t)
 {
     return 2 - t->one_timer_only;
@@ -94,36 +93,13 @@ static void timer_update_irq(struct timerblock *t)
     unsigned int i, irq = 0;
     uint32_t csr;
 
-    for (i = 0; i < num_timers(t); i++)
-    {
+    for (i = 0; i < num_timers(t); i++) {
         csr = t->timers[i].regs[R_TCSR];
         irq |= (csr & TCSR_TINT) && (csr & TCSR_ENIT);
     }
+
     /* All timers within the same slave share a single IRQ line.  */
     qemu_set_irq(t->irq, !!irq);
-}
-
-static void on_capture(struct timerblock *inst)
-{
-    struct xlx_timer *xt;
-    xt = &(inst->timers[0]);
-    if (xt->regs[R_TCSR] & TCSR_CAPT)
-    {
-        xt->regs[R_TCSR] |= TCSR_TINT;
-        if (xt->regs[R_TCSR] & TCSR_ARHT)
-        {
-            xt->regs[R_TLR] = xt->regs[R_TCR];
-        }
-        else
-        {
-            if (tlr_read)
-            {
-                xt->regs[R_TLR] = xt->regs[R_TCR];
-                tlr_read = 0;
-            }
-        }
-        timer_update_irq(inst);
-    }
 }
 
 static uint64_t
@@ -141,21 +117,18 @@ timer_read(void *opaque, hwaddr addr, unsigned int size)
     addr &= 0x3;
     switch (addr)
     {
-    case R_TCR:
-        r = ptimer_get_count(xt->ptimer);
-        if (!(xt->regs[R_TCSR] & TCSR_UDT))
-            r = ~r;
-        on_capture(t);
-        D(qemu_log("xlx_timer t=%d read counter=%x udt=%d\n",
-                   timer, r, xt->regs[R_TCSR] & TCSR_UDT));
-        break;
-    case R_TLR:
-        tlr_read = 1;
-        break;
-    default:
-        if (addr < ARRAY_SIZE(xt->regs))
-            r = xt->regs[addr];
-        break;
+        case R_TCR:
+                r = ptimer_get_count(xt->ptimer);
+                if (!(xt->regs[R_TCSR] & TCSR_UDT))
+                    r = ~r;
+                D(qemu_log("xlx_timer t=%d read counter=%x udt=%d\n",
+                         timer, r, xt->regs[R_TCSR] & TCSR_UDT));
+            break;
+        default:
+            if (addr < ARRAY_SIZE(xt->regs))
+                r = xt->regs[addr];
+            break;
+
     }
     D(fprintf(stderr, "%s timer=%d %x=%x\n", __func__, timer, addr * 4, r));
     return r;
@@ -179,17 +152,15 @@ static void timer_enable(struct xlx_timer *xt)
     ptimer_run(xt->ptimer, 1);
 }
 
-static int create_timer_duty_event(uint64_t duty_cycle)
-{
+static int create_timer_duty_event(uint64_t duty_cycle) {
     int ret;
     TimerEvent *evt;
-    evt = (TimerEvent *)malloc(sizeof(TimerEvent));
-    if (!evt)
-    {
-        return -1;
+    evt = (TimerEvent*)malloc(sizeof(TimerEvent));
+    if (!evt) { 
+        return -1; 
     }
     evt->type = TIMER_EVT_DUTY;
-    evt->data = (void *)duty_cycle;
+    evt->data = (void*)duty_cycle;
     ret = zedmon_notify_event(ZEDMON_EVENT_CLASS_TIMER, evt, ZEDMON_EVENT_FLAG_DESTROY);
     return ret;
 }
@@ -227,87 +198,78 @@ timer_write(void *opaque, hwaddr addr,
     timer = timer_from_addr(addr);
     xt = &t->timers[timer];
     D(fprintf(stderr, "%s addr=%x val=%x (timer=%d off=%d)\n",
-              __func__, addr * 4, value, timer, addr & 3));
+             __func__, addr * 4, value, timer, addr & 3));
     /* Further decoding to address a specific timers reg.  */
     addr &= 3;
-    switch (addr)
+    switch (addr) 
     {
-    case R_TCSR:
-        if (value & TCSR_TINT)
-            value &= ~TCSR_TINT;
+        case R_TCSR:
+            if (value & TCSR_TINT)
+                value &= ~TCSR_TINT;
 
-        xt->regs[addr] = value & 0x7ff;
-        // enabling single timer
-        if (value & TCSR_ENT)
-        {
-            ptimer_transaction_begin(xt->ptimer);
-            timer_enable(xt);
-            ptimer_transaction_commit(xt->ptimer);
-            struct xlx_timer *timer0 = &t->timers[0];
-            struct xlx_timer *timer1 = &t->timers[1];
-            ot = (timer == 0) ? &t->timers[1] : &t->timers[0];
-            // check that both timers are enabled before sending event
-            if (ot->regs[addr] & TCSR_ENT)
-            {
-                uint64_t duty_cycle = 100 - (((float)((timer1->regs[R_TLR]) - (timer0->regs[R_TLR]))) / 1000.0);
+            xt->regs[addr] = value & 0x7ff;
+            // enabling single timer
+            if (value & TCSR_ENT) {
+                ptimer_transaction_begin(xt->ptimer);
+                timer_enable(xt);
+                ptimer_transaction_commit(xt->ptimer);
+                struct xlx_timer *timer0 = &t->timers[0];
+                struct xlx_timer *timer1 = &t->timers[1];
+                ot = (timer == 0) ? &t->timers[1] : &t->timers[0];
+                // check that both timers are enabled before sending event 
+                if (ot->regs[addr] & TCSR_ENT) {
+                    uint64_t duty_cycle = 100 - (((float)((timer1->regs[R_TLR]) - (timer0->regs[R_TLR])))/1000.0);
+                    ret = create_timer_duty_event(duty_cycle);
+                    if(ret) { 
+                        //error occurred
+                    }
+                }
+            }
+            // timer disabled 
+            if (value & !TCSR_ENT) {
+                uint64_t duty_cycle = 0;
                 ret = create_timer_duty_event(duty_cycle);
-                if (ret)
-                {
+                if(ret) { 
                     //error occurred
                 }
             }
-        }
-        // timer disabled
-        if (value & !TCSR_ENT)
-        {
-            uint64_t duty_cycle = 0;
-            ret = create_timer_duty_event(duty_cycle);
-            if (ret)
-            {
-                //error occurred
+            // enabling both timers 
+            if (value & TCSR_ENALL) {
+                struct xlx_timer *timer0 = &t->timers[0];
+                struct xlx_timer *timer1 = &t->timers[1];
+                ptimer_transaction_begin(timer0->ptimer);
+                timer_enable(timer0);
+                ptimer_transaction_commit(timer0->ptimer);
+                ptimer_transaction_begin(timer1->ptimer);
+                timer_enable(timer1);
+                ptimer_transaction_commit(timer1->ptimer);
+                // setting individual timers TCSR_ENT bit
+                timer0->regs[addr] |= TCSR_ENT;
+                timer1->regs[addr] |= TCSR_ENT;
+                uint64_t duty_cycle = 100 - (((float)((timer1->regs[R_TLR]) - (timer0->regs[R_TLR])))/1000.0);
+                ret = create_timer_duty_event(duty_cycle);
+                if(ret) {
+                    //error occurred
+                }
             }
-        }
-        // enabling both timers
-        if (value & TCSR_ENALL)
-        {
+        break;
+        case R_TLR:
+            xt->regs[addr] = value;
             struct xlx_timer *timer0 = &t->timers[0];
             struct xlx_timer *timer1 = &t->timers[1];
-            ptimer_transaction_begin(timer0->ptimer);
-            timer_enable(timer0);
-            ptimer_transaction_commit(timer0->ptimer);
-            ptimer_transaction_begin(timer1->ptimer);
-            timer_enable(timer1);
-            ptimer_transaction_commit(timer1->ptimer);
-            // setting individual timers TCSR_ENT bit
-            timer0->regs[addr] |= TCSR_ENT;
-            timer1->regs[addr] |= TCSR_ENT;
-            uint64_t duty_cycle = 100 - (((float)((timer1->regs[R_TLR]) - (timer0->regs[R_TLR]))) / 1000.0);
-            ret = create_timer_duty_event(duty_cycle);
-            if (ret)
-            {
-                //error occurred
+            // check that both timers are enabled
+            if ((timer0->regs[R_TCSR] & TCSR_ENT) && (timer1->regs[R_TCSR] & TCSR_ENT)) {
+                uint64_t duty_cycle = 100 - (((float)((timer1->regs[R_TLR]) - (timer0->regs[R_TLR])))/1000.0);
+                ret = create_timer_duty_event(duty_cycle);
+                if(ret) {
+                    //error occurred
+                }
             }
-        }
-        break;
-    case R_TLR:
-        xt->regs[addr] = value;
-        struct xlx_timer *timer0 = &t->timers[0];
-        struct xlx_timer *timer1 = &t->timers[1];
-        // check that both timers are enabled
-        if ((timer0->regs[R_TCSR] & TCSR_ENT) && (timer1->regs[R_TCSR] & TCSR_ENT))
-        {
-            uint64_t duty_cycle = 100 - (((float)((timer1->regs[R_TLR]) - (timer0->regs[R_TLR]))) / 1000.0);
-            ret = create_timer_duty_event(duty_cycle);
-            if (ret)
-            {
-                //error occurred
-            }
-        }
-        break;
-    default:
-        if (addr < ARRAY_SIZE(xt->regs))
-            xt->regs[addr] = value;
-        break;
+            break;
+        default:
+            if (addr < ARRAY_SIZE(xt->regs))
+                xt->regs[addr] = value;
+            break;
     }
     timer_update_irq(t);
 }
@@ -318,7 +280,9 @@ static const MemoryRegionOps timer_ops = {
     .endianness = DEVICE_NATIVE_ENDIAN,
     .valid = {
         .min_access_size = 4,
-        .max_access_size = 4}};
+        .max_access_size = 4
+    }
+};
 
 static void timer_hit(void *opaque)
 {
@@ -339,8 +303,7 @@ static void xilinx_timer_realize(DeviceState *dev, Error **errp)
 
     /* Init all the ptimers.  */
     t->timers = g_malloc0(sizeof t->timers[0] * num_timers(t));
-    for (i = 0; i < num_timers(t); i++)
-    {
+    for (i = 0; i < num_timers(t); i++) {
         struct xlx_timer *xt = &t->timers[i];
 
         xt->parent = t;
@@ -366,7 +329,7 @@ static void xilinx_timer_init(Object *obj)
 
 static Property xilinx_timer_properties[] = {
     DEFINE_PROP_UINT32("clock-frequency", struct timerblock, freq_hz,
-                       62 * 1000000),
+                                                                62 * 1000000),
     DEFINE_PROP_UINT8("one-timer-only", struct timerblock, one_timer_only, 0),
     DEFINE_PROP_END_OF_LIST(),
 };
@@ -377,17 +340,17 @@ static void xilinx_timer_class_init(ObjectClass *klass, void *data)
 
     dc->realize = xilinx_timer_realize;
     device_class_set_props(dc, xilinx_timer_properties);
-
+    
     zedmon_register_peripheral(ZEDMON_EVENT_CLASS_TIMER, "AXITIMER",
                                NULL, NULL);
 }
 
 static const TypeInfo xilinx_timer_info = {
-    .name = TYPE_XILINX_TIMER,
-    .parent = TYPE_SYS_BUS_DEVICE,
+    .name          = TYPE_XILINX_TIMER,
+    .parent        = TYPE_SYS_BUS_DEVICE,
     .instance_size = sizeof(struct timerblock),
     .instance_init = xilinx_timer_init,
-    .class_init = xilinx_timer_class_init,
+    .class_init    = xilinx_timer_class_init,
 };
 
 static void xilinx_timer_register_types(void)
