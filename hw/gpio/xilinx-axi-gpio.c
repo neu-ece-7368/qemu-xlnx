@@ -347,7 +347,6 @@ static void xlnx_axi_gpio_write(void *opaque, hwaddr addr,
         //  Might have to memcpy to be sure this casts correctly
         s->duty_cycle = 100 - (uint64_t)(((double)(s->falling_edge_time - s->rising_edge_time) / (double)(s->period)) * 100);
         s->rising_edge_time = now; // for next period
-        printf("duty: %llu\n", s->duty_cycle);
         on_capture(true);
     }
     else if (value == 0)

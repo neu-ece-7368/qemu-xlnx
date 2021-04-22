@@ -33,9 +33,6 @@
 
 #define D(x)
 
-#define DEBUG
-#define CAPTURE
-
 #define R_TCSR 0
 #define R_TLR 1
 #define R_TCR 2
@@ -108,7 +105,7 @@ static void timer_update_irq(struct timerblock *t)
     qemu_set_irq(t->irq, !!irq);
 }
 
-extern void on_capture(bool high)
+void on_capture(bool high)
 {
     uint32_t r = 0;
     struct xlx_timer *xt;
@@ -131,9 +128,6 @@ extern void on_capture(bool high)
                 if (!(xt->regs[R_TCSR] & TCSR_UDT))
                     r = ~r;
                 xt->regs[R_TLR] = r;
-#ifdef CAPTURE
-                printf("xt->regs[R_TLR]: %d\n", xt->regs[R_TLR]);
-#endif
                 tlr_read = 0;
             }
         }
@@ -157,9 +151,6 @@ timer_read(void *opaque, hwaddr addr, unsigned int size)
     switch (addr)
     {
     case R_TCR:
-#ifdef DEBUG
-        printf("timer read TCR: %d ", r);
-#endif
         r = ptimer_get_count(xt->ptimer);
         if (!(xt->regs[R_TCSR] & TCSR_UDT))
             r = ~r;
@@ -195,7 +186,6 @@ static void timer_enable(struct xlx_timer *xt)
     else
         count = ~0 - xt->regs[R_TLR];
     ptimer_set_limit(xt->ptimer, count, 1);
-    printf("count: %llu", count);
     ptimer_run(xt->ptimer, 1);
 }
 
@@ -241,7 +231,6 @@ timer_write(void *opaque, hwaddr addr,
     } else {
         oneTimerEnabled = false;
     }
-    printf("timer write xt->regs[R_TCR]: %u\n", xt->regs[R_TCR]);
     D(fprintf(stderr, "%s addr=%x val=%x (timer=%d off=%d)\n",
               __func__, addr * 4, value, timer, addr & 3));
     /* Further decoding to address a specific timers reg.  */
@@ -287,9 +276,6 @@ timer_write(void *opaque, hwaddr addr,
         // enabling both timers
         if ((value & TCSR_ENALL) && !wasEnabled)
         {
-            #ifdef DEBUG
-            printf("enabling both timers");
-            #endif
             t = instance;
             struct xlx_timer *timer0 = &t->timers[0];
             struct xlx_timer *timer1 = &t->timers[1];
@@ -355,9 +341,6 @@ static void timer_hit(void *opaque)
 
 static void xilinx_timer_realize(DeviceState *dev, Error **errp)
 {
-#ifdef DEBUG
-    printf("calling xilinx_timer_realize");
-#endif
     struct timerblock *t = XILINX_TIMER(dev);
     unsigned int i;
 
