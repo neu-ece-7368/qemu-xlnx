@@ -11,6 +11,7 @@ from bottle import (
     ServerAdapter,
     TEMPLATE_PATH,
 )
+import simpleaudio as sa
 
 
 class ZWebInterface:
@@ -80,12 +81,19 @@ class ZWebInterface:
                         )
         if evt_desc["type"] == "timer":
             self._logger.debug(evt_desc)
-            if evt_desc["event"] == "DUTY":
-                self._led_duty_cycle[0] = evt_desc["data"]
+        # TODO: parsing here
+        if evt_desc["type"] == "wav":
+            self._logger.debug("playing {}".format(evt_desc["file"]))
+            self._play_wav(evt_desc["file"])
 
     def index(self):
         """Return main and only page."""
         return template("index")
+
+    def _play_wav(self, wav):
+        wave_obj = sa.WaveObject.from_wave_file(wav)
+        play_obj = wave_obj.play()
+        play_obj.wait_done()
 
     def _recv_peripherals(self, plist):
         # print(plist)
