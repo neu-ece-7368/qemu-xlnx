@@ -92,8 +92,7 @@ class ZWebInterface:
 
     def _play_wav(self, wav):
         wave_obj = sa.WaveObject.from_wave_file(wav)
-        play_obj = wave_obj.play()
-        play_obj.wait_done()
+        wave_obj.play()
 
     def _recv_peripherals(self, plist):
         # print(plist)
