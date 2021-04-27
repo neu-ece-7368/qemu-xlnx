@@ -99,10 +99,8 @@ class ZWebInterface:
         pass
 
     def _recv_led_state(self, value):
-        self._logger.debug("recv_led_state state: {}".format(value))
         for i in range(8):
             self._led_duty_cycle[i] = 0
-        pass
 
     def _recv_led_dir(self, value):
         self._led_dir_state = value
