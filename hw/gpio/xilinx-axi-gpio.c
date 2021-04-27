@@ -291,6 +291,9 @@ static void xlnx_axi_gpio_write(void *opaque, hwaddr addr,
     RegisterInfo *reg = NULL;
     XlnxAXIGPIO *s = NULL;
     GPIOEvent *evt;
+    int toUpdate[GPIO_MAX];
+    memset(toUpdate, 0, sizeof(toUpdate));
+
     int ret;
     int i;
 
@@ -337,6 +340,7 @@ static void xlnx_axi_gpio_write(void *opaque, hwaddr addr,
 
     uint8_t index;
     for (index = 0; index < GPIO_MAX; index++) {
+        toUpdate[index] = 0;
         if (value & (1 << index)) {
 
             // calculate time since last rising edge
@@ -352,10 +356,16 @@ static void xlnx_axi_gpio_write(void *opaque, hwaddr addr,
             if (duty_cycle > 100) {
                 // if duty cycle is larger than 100, so issue or timed out, then set to zero
                 s->comps[index].duty_cycle = 0;
-            } else if (abs(old_duty_cyle - duty_cycle) > 2) {
+
+            } else if (abs(old_duty_cyle - duty_cycle) > 10) {
                 // Change if 5% duty cycle change
-                s->comps[index].duty_cycle = duty_cycle;
-            }
+                s->comps[index].duty_cycle =  duty_cycle > 100 ? 100 : duty_cycle;
+                toUpdate[index] = 1;
+            }   
+
+        } else if (abs(now - s->comps[index].rising_edge_time) > (s->comps[index].period * 4) && s->comps[index].duty_cycle != 0) {
+            s->comps[index].duty_cycle = 0;
+            toUpdate[index] = 1;
         } else {
             // faling edge 
             s->comps[index].falling_edge_time = now;
@@ -422,6 +432,32 @@ static void xlnx_axi_gpio_write(void *opaque, hwaddr addr,
         }
     }
 
+    ret = find_axi_gpio_chip_number(s);
+    if (ret < 0)
+    {
+        //error
+        //return;
+        ret = 0xFF;
+    }
+    evt->gpio_dev = ret;
+
+    //publish
+    evt->value = value;
+    evt->data = (void*)100;
+    // ret = zedmon_notify_event(ZEDMON_EVENT_CLASS_GPIO, evt,
+    //                         ZEDMON_EVENT_FLAG_DESTROY);
+    if(ret)
+    {
+        //error occurred
+    } else {
+        //printf("Sent event\n");
+    }
+
+    for (i = 0; i < GPIO_MAX; i++) {
+        if (toUpdate[i] == 1) {
+            xlnx_axi_gpio_send_pwm_events(opaque, addr, i);
+        }
+    }
 }
 
 static const MemoryRegionOps xlnx_axi_gpio_ops = {
@@ -511,6 +547,7 @@ static void xlnx_axi_gpio_init(Object *obj)
 
     //class-wide book keeping
     gpioClass.chips[gpioClass.chip_count++] = s;
+   
 }
 
 static const VMStateDescription vmstate_gpio = {

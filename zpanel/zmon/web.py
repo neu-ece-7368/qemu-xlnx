@@ -75,8 +75,9 @@ class ZWebInterface:
                             "data"
                         ]
                         self._logger.debug(
-                            "setting LED state to {}".format(
-                                self._led_duty_cycle
+                            "setting LED {} state: {}".format(
+                                evt_desc["value"],
+                                self._led_duty_cycle[evt_desc["value"]],
                             )
                         )
         if evt_desc["type"] == "timer":
@@ -99,7 +100,10 @@ class ZWebInterface:
         pass
 
     def _recv_led_state(self, value):
-        self._led_duty_cycle = value
+        self._logger.debug("recv_led_state state: {}".format(value))
+        for i in range(8):
+            self._led_duty_cycle[i] = 0
+        pass
 
     def _recv_led_dir(self, value):
         self._led_dir_state = value
