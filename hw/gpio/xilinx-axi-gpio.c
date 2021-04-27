@@ -352,7 +352,7 @@ static void xlnx_axi_gpio_write(void *opaque, hwaddr addr,
             if (duty_cycle > 100) {
                 // if duty cycle is larger than 100, so issue or timed out, then set to zero
                 s->comps[index].duty_cycle = 0;
-            } else if (abs(old_duty_cyle - duty_cycle) > 5) {
+            } else if (abs(old_duty_cyle - duty_cycle) > 2) {
                 // Change if 5% duty cycle change
                 s->comps[index].duty_cycle = duty_cycle;
             }
@@ -399,23 +399,27 @@ static void xlnx_axi_gpio_write(void *opaque, hwaddr addr,
             return;
         }
 
-    //set value
-    evt->data = (void*)value;
-    ret = find_axi_gpio_chip_number(s);
-    if (ret < 0)
-    {
-        //error
-        //return;
-        ret = 0xFF;
-    }
-    evt->gpio_dev = ret;
 
-    //publish
-    ret = zedmon_notify_event(ZEDMON_EVENT_CLASS_GPIO, evt,
-                              ZEDMON_EVENT_FLAG_DESTROY);
-    if(ret)
-    {
-        //error occurred
+        ret = find_axi_gpio_chip_number(s);
+        if (ret < 0)
+        {
+            //error
+            //return;
+            ret = 0xFF;
+        }
+        evt->gpio_dev = ret;
+
+        //publish
+        evt->value = index;
+        evt->data = (void*)s->comps[index].duty_cycle;
+        ret = zedmon_notify_event(ZEDMON_EVENT_CLASS_GPIO, evt,
+                                ZEDMON_EVENT_FLAG_DESTROY);
+        if(ret)
+        {
+            //error occurred
+        } else {
+            //printf("Sent event\n");
+        }
     }
 
 }

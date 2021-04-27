@@ -67,8 +67,8 @@ class ZWebInterface:
                     elif evt_desc['event'] == 'VALUE':
                         self._led_value = evt_desc['value']
                         self._led_duty_cycle = evt_desc['data']
-                        self._logger.debug('setting LED {} state'
-                                           .format(self._led_value))
+                        self._logger.debug('setting LED {} state: {}'
+                                           .format(self._led_value, self._led_duty_cycle))
         if evt_desc['type'] == 'timer':
             self._logger.debug(evt_desc)
         # TODO: parsing here 

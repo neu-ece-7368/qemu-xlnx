@@ -165,24 +165,6 @@ static int create_timer_duty_event(uint64_t duty_cycle) {
     return ret;
 }
 
-/*static void
-on_capture(struct timerblock* inst) {
-    struct xlx_timer *xt;
-    xt = &(inst->timers[0]);
-    if(xt->regs[R_TCSR] & TCSR_CAPT) {
-        xt->regs[R_TCSR] |= TCSR_TINT;
-        if(xt->regs[R_TCSR] & TCSR_ARHT) {
-            xt->regs[R_TLR] = xt->regs[R_TCR]; 
-        } else {
-            if(tlr_read) {
-                xt->regs[R_TLR] = xt->regs[R_TCR]; 
-                tlr_read = 0;
-            }
-        }
-    timer_update_irq(inst);
-    }
-}*/
-
 static void
 timer_write(void *opaque, hwaddr addr,
             uint64_t val64, unsigned int size)

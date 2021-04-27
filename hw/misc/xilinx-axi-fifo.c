@@ -154,10 +154,12 @@ static void close_wav_file(RegisterInfo *reg, uint64_t val)
 
     // Send event
     WAVEvent* evt = (WAVEvent*)malloc(sizeof(WAVEvent));
-    getcwd(evt->filename, 95);
-    strcat(evt->filename, "/");
-    strcat(evt->filename, WAVEFILE);
-    zedmon_notify_event(ZEDMON_EVENT_CLASS_WAV, evt, ZEDMON_EVENT_FLAG_DESTROY);
+    char* ret = getcwd(evt->filename, 95);
+    if (ret != NULL) {
+        strcat(evt->filename, "/");
+        strcat(evt->filename, WAVEFILE);
+        zedmon_notify_event(ZEDMON_EVENT_CLASS_WAV, evt, ZEDMON_EVENT_FLAG_DESTROY);
+    }
 }
 
 static uint64_t get_fifo_vacancy(RegisterInfo *reg, uint64_t val)

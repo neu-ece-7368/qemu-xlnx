@@ -105,7 +105,7 @@ static void timer_update_irq(struct timerblock *t)
     qemu_set_irq(t->irq, !!irq);
 }
 
-void on_capture(bool high)
+/*void on_capture(bool high)
 {
     uint32_t r = 0;
     struct xlx_timer *xt;
@@ -133,7 +133,7 @@ void on_capture(bool high)
         }
         timer_update_irq(instance);
     }
-}
+}*/
 
 static uint64_t
 timer_read(void *opaque, hwaddr addr, unsigned int size)
