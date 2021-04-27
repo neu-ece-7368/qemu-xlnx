@@ -547,6 +547,7 @@ static void xlnx_axi_gpio_init(Object *obj)
 
     //class-wide book keeping
     gpioClass.chips[gpioClass.chip_count++] = s;
+
    
 }
 
