@@ -61,6 +61,15 @@ REG32(IP_IER, 0x128)
 #define R_MAX (R_IP_IER + 1)
 #define GPIO_MAX 8
 
+typedef struct XlixAXIGPIOComponent {
+    uint64_t rising_edge_time; // ns
+    uint64_t falling_edge_time; // ns
+    uint64_t raw_values[20];
+    uint8_t counter;
+    uint64_t duty_cycle;  // whole number 1-100
+    uint64_t period;
+} XlixAXIGPIOComponent;
+
 typedef struct XlnxAXIGPIO {
     SysBusDevice parent_obj;
     MemoryRegion iomem;
@@ -98,6 +107,15 @@ static int find_axi_gpio_chip_number(XlnxAXIGPIO* s)
     }
 
     return -1;
+}
+
+static void initalize_component(XlixAXIGPIOComponent *c) {
+    printf("Initalizing components to zero\n");
+    c->rising_edge_time = 0;
+    c->falling_edge_time = 0;
+    c->duty_cycle = 0;
+    c->period = 0;
+    c->counter = 0;
 }
 
 /* The interrupts should be triggered when a change arrives on the GPIO pins */
@@ -349,28 +367,45 @@ static void xlnx_axi_gpio_write(void *opaque, hwaddr addr,
                       
             s->comps[index].rising_edge_time = now; // for next period
 
+            double intermediary = ((double)(now - s->comps[index].falling_edge_time) / (double)(s->comps[index].period));
+            if (intermediary > 1) {
+                intermediary = 0;
+            }
             //  Might have to memcpy to be sure this casts correctly
-            uint64_t duty_cycle = 100 - (uint64_t)(((double)(s->comps[index].rising_edge_time - s->comps[index].falling_edge_time) / (double)(s->comps[index].period)) * 100.0);
-            uint64_t old_duty_cyle = s->comps[index].duty_cycle;
+            uint64_t duty_cycle = 100 - (uint64_t)(intermediary * 100);
+            uint64_t old_duty_cycle = s->comps[index].duty_cycle;
+            
+            s->comps[index].duty_cycle = duty_cycle;
+            // uint8_t count = s->comps[index].counter;
+            // s->comps[index].raw_values[count] = duty_cycle;
+            // s->comps[index].duty_cycle = ((double)(old_duty_cycle + duty_cycle - s->comps[index].raw_values[count == 0 ? 19 : count - 1])) / 20.0;
+            // s->comps[index].counter = count == 19 ? 0 : count + 1;
+            toUpdate[index] = 1;
+            printf("%ld,%d,%ld,%ld,%ld,%ld\n", value, index, duty_cycle, period,now, s->comps[index].falling_edge_time);
 
             if (duty_cycle > 100) {
                 // if duty cycle is larger than 100, so issue or timed out, then set to zero
                 s->comps[index].duty_cycle = 0;
+                toUpdate[index] = 1;
 
-            } else if (abs(old_duty_cyle - duty_cycle) > 10) {
+            } else if (abs(old_duty_cycle - s->comps[index].duty_cycle) > 10) {
                 // Change if 5% duty cycle change
-                s->comps[index].duty_cycle =  duty_cycle > 100 ? 100 : duty_cycle;
+                s->comps[index].duty_cycle = duty_cycle > 100 ? 100 : duty_cycle;
                 toUpdate[index] = 1;
             }   
 
-        } else if (abs(now - s->comps[index].rising_edge_time) > (s->comps[index].period * 4) && s->comps[index].duty_cycle != 0) {
-            s->comps[index].duty_cycle = 0;
-            toUpdate[index] = 1;
         } else {
+            if (abs(now - s->comps[index].rising_edge_time) > (s->comps[index].period * 4) && s->comps[index].duty_cycle != 0) {
+                s->comps[index].rising_edge_time = now;
+                s->comps[index].duty_cycle = 0;
+                toUpdate[index] = 1;
+            }
             // faling edge 
+
             s->comps[index].falling_edge_time = now;
         }
-    
+    }
+
 
         //publish event
         evt = (GPIOEvent*)malloc(sizeof(GPIOEvent));
@@ -548,7 +583,10 @@ static void xlnx_axi_gpio_init(Object *obj)
     //class-wide book keeping
     gpioClass.chips[gpioClass.chip_count++] = s;
 
-   
+    int i;
+    for (i = 0; i < GPIO_MAX; i++) {
+        initalize_component(&s->comps[i]);
+    }
 }
 
 static const VMStateDescription vmstate_gpio = {
