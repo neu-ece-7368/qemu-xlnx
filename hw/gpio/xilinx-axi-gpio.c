@@ -587,13 +587,13 @@ static void xlnx_axi_gpio_write(void *opaque, hwaddr addr,
     //publish
     evt->value = value;
     evt->data = (void*)0;
+    // Event commentde out since it's the original event, wanted to preserve
+    // But isn't used any more currently. 
     // ret = zedmon_notify_event(ZEDMON_EVENT_CLASS_GPIO, evt,
     //                         ZEDMON_EVENT_FLAG_DESTROY);
     if(ret)
     {
         //error occurred
-    } else {
-        //printf("Sent event\n");
     }
 
     for (i = 0; i < GPIO_MAX; i++) {
