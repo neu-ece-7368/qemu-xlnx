@@ -64,7 +64,6 @@ class ZWebInterface:
 
     def register_event(self, evt_desc):
         """Event callback."""
-
         if evt_desc["type"] == "gpio":
             if evt_desc["chip"] == self._LED_GPIOCHIP:
                 if evt_desc["channel"] == 0:
@@ -110,7 +109,6 @@ class ZWebInterface:
 
     def _get_leds_state(self):
         # if direction is set to input then turn off
-        # TODO incorporate direction back in
         led_states = {}
         for i in range(8):
             led_states[i] = self._led_duty_cycle[i]
