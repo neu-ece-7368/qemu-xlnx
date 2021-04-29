@@ -133,6 +133,7 @@ class ZCmdClient(StoppableThread):
             try:
                 resp = socket.recv_string().strip()
                 if callback is not None:
+                    self._logger.debug("GPIO get {}".format(args[0], resp))
                     callback(int(resp.split("0x")[1], 16))
             except zmq.ZMQError:
                 self._logger.debug("error receiving response")
@@ -143,13 +144,17 @@ class ZCmdClient(StoppableThread):
                 resp = socket.recv_string().strip()
                 if callback is not None:
                     callback(int(resp.split("0x")[1], 16))
+
             except zmq.ZMQError:
                 self._logger.debug("error receiving response")
         elif command == self._GPIO_SET_DIR:
             socket.send_string("GPIO SET {} {}".format(args[0], args[1]))
+            self._logger.debug("GPIO set send {} {}".format(args[0], args[1]))
 
             try:
                 resp = socket.recv_string().strip()
+                self._logger.debug("GPIO set recv {}".format(resp))
+
             except zmq.ZMQError:
                 self._logger.debug("error receiving response")
 

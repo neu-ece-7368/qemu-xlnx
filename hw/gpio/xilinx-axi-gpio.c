@@ -66,6 +66,7 @@ typedef struct XlixAXIGPIOComponent {
     uint64_t falling_edge_time; // ns
     uint64_t raw_values[20];
     uint8_t counter;
+    uint64_t sum;
     uint64_t duty_cycle;  // whole number 1-100
     uint64_t period;
 } XlixAXIGPIOComponent;
@@ -110,12 +111,13 @@ static int find_axi_gpio_chip_number(XlnxAXIGPIO* s)
 }
 
 static void initalize_component(XlixAXIGPIOComponent *c) {
-    printf("Initalizing components to zero\n");
     c->rising_edge_time = 0;
     c->falling_edge_time = 0;
     c->duty_cycle = 0;
     c->period = 0;
     c->counter = 0;
+    c->sum = 0;
+
 }
 
 /* The interrupts should be triggered when a change arrives on the GPIO pins */
@@ -302,6 +304,84 @@ static uint64_t xlnx_axi_gpio_read(void *opaque, hwaddr addr, unsigned size)
     return register_read_memory(opaque, addr, size);
 }
 
+static void xlnx_axi_gpio_send_pwm_events(void *opaque, hwaddr addr, int index) {
+    XlnxAXIGPIO *s = NULL;
+    RegisterInfoArray *reg_array = opaque;
+    RegisterInfo *reg = NULL;
+
+    int i;
+    for (i = 0; i < reg_array->num_elements; i++) {
+      if (reg_array->r[i]->access->addr == addr) {
+        reg = reg_array->r[i];
+        break;
+      }
+    }
+    s = XLNX_AXI_GPIO(reg->opaque);
+
+    GPIOEvent *evt;
+    int ret;
+
+    
+    //publish event
+    evt = (GPIOEvent*)malloc(sizeof(GPIOEvent));
+
+    if (!evt) {
+        return;
+    }
+
+    if (addr == 0x00 || addr == 0x08) {
+        evt->type = GPIO_EVT_VALUE;
+        if (addr == 0x00) {
+            evt->channel = 0;
+        } else {
+            evt->channel = 1;
+        }
+    } else if (addr == 0x04 || addr == 0x0C) {
+        evt->type = GPIO_EVT_DIRECTION;
+        if (addr == 0x04) {
+            evt->channel = 0;
+        } else {
+            evt->channel = 1;
+        }
+    } else {
+        return;
+    }
+
+    
+    ret = find_axi_gpio_chip_number(s);
+    if (ret < 0)
+    {
+        //return error
+        ret = 0xFF;
+    }
+    evt->gpio_dev = ret;
+
+    //publish
+
+    evt->value = index;
+    evt->data = (void*)s->comps[index].duty_cycle;
+    ret = zedmon_notify_event(ZEDMON_EVENT_CLASS_GPIO, evt,
+                            ZEDMON_EVENT_FLAG_DESTROY);
+    if(ret)
+    {
+        //error occurred
+    }
+    
+}
+
+static uint64_t xlnx_calculate_duty_cycle(uint64_t t_1, uint64_t t_2, 
+                                          uint64_t period) {
+    double intermediary = ((double)(t_1 - t_2) / (double)(period));
+    if (intermediary >= 1) {
+        // Account of overflow over time
+        intermediary = 0;
+    }
+    //  Might have to memcpy to be sure this casts correctly
+    uint64_t calculated_duty_cycle = 100 - (uint64_t)(intermediary * 100);
+
+    return calculated_duty_cycle;
+}
+
 static void xlnx_axi_gpio_write(void *opaque, hwaddr addr,
                                 uint64_t value, unsigned size)
 {
@@ -325,7 +405,7 @@ static void xlnx_axi_gpio_write(void *opaque, hwaddr addr,
     register_write_memory(opaque, addr, value, size);
 
     if (!reg) {
-       return;
+        return;
     }
 
     s = XLNX_AXI_GPIO(reg->opaque);
@@ -357,52 +437,80 @@ static void xlnx_axi_gpio_write(void *opaque, hwaddr addr,
 
 
     uint8_t index;
+
     for (index = 0; index < GPIO_MAX; index++) {
         toUpdate[index] = 0;
         if (value & (1 << index)) {
 
             // calculate time since last rising edge
             uint64_t period =  now - s->comps[index].rising_edge_time; // in nanoseconds;
-            s->comps[index].period = period;
-                      
-            s->comps[index].rising_edge_time = now; // for next period
 
-            double intermediary = ((double)(now - s->comps[index].falling_edge_time) / (double)(s->comps[index].period));
-            if (intermediary > 1) {
-                intermediary = 0;
-            }
-            //  Might have to memcpy to be sure this casts correctly
-            uint64_t duty_cycle = 100 - (uint64_t)(intermediary * 100);
-            uint64_t old_duty_cycle = s->comps[index].duty_cycle;
-            
-            s->comps[index].duty_cycle = duty_cycle;
-            // uint8_t count = s->comps[index].counter;
-            // s->comps[index].raw_values[count] = duty_cycle;
-            // s->comps[index].duty_cycle = ((double)(old_duty_cycle + duty_cycle - s->comps[index].raw_values[count == 0 ? 19 : count - 1])) / 20.0;
-            // s->comps[index].counter = count == 19 ? 0 : count + 1;
-            toUpdate[index] = 1;
-            printf("%ld,%d,%ld,%ld,%ld,%ld\n", value, index, duty_cycle, period,now, s->comps[index].falling_edge_time);
+            if (period > (s->comps[index].period * 4)) {
+                uint64_t filler_dc = 100; //xlnx_calculate_duty_cycle(now, s->comps[index].falling_edge_time, period);
 
-            if (duty_cycle > 100) {
-                // if duty cycle is larger than 100, so issue or timed out, then set to zero
-                s->comps[index].duty_cycle = 0;
+                for (i = 0; i < 20; i++) {
+                    s->comps[index].raw_values[i] = filler_dc;
+                }
+                s->comps[index].duty_cycle = filler_dc;
+                s->comps[index].sum = filler_dc * 20;
+
+                toUpdate[index] = 1;
+                s->comps[index].period = period;
+                s->comps[index].falling_edge_time =  s->comps[index].rising_edge_time;
+                s->comps[index].rising_edge_time = now;
+
+
+            } else {
+                s->comps[index].period = period;
+
+                uint64_t calculated_duty_cycle = xlnx_calculate_duty_cycle(now, s->comps[index].falling_edge_time, period);
+                s->comps[index].rising_edge_time = now;
+
+
+                // Moving average for duty_cycle since calculations fluctuate and aren't precise
+                uint64_t old_total = s->comps[index].sum;
+                uint8_t count = s->comps[index].counter;
+                uint64_t last_value = s->comps[index].raw_values[count];
+                s->comps[index].raw_values[count] = calculated_duty_cycle;
+                uint64_t new_sum = (old_total + calculated_duty_cycle - last_value);
+                s->comps[index].sum = new_sum;
+                uint64_t new_duty_cycle = (uint64_t)((double)new_sum / 20.0);
+                
+                s->comps[index].duty_cycle = new_duty_cycle;
+                s->comps[index].counter = count >= 19 ? 0 : count + 1;
                 toUpdate[index] = 1;
 
-            } else if (abs(old_duty_cycle - s->comps[index].duty_cycle) > 10) {
-                // Change if 5% duty cycle change
-                s->comps[index].duty_cycle = duty_cycle > 100 ? 100 : duty_cycle;
-                toUpdate[index] = 1;
-            }   
+                if (new_duty_cycle > 100) {
+                    // if duty cycle is larger than 100, so issue or timed out, then set to zero
+                    s->comps[index].duty_cycle = 0;
+                    toUpdate[index] = 1;
+
+                } else if (abs(old_total - new_duty_cycle) > 5) {
+                    // Change if 5% duty cycle change
+                    s->comps[index].duty_cycle = new_duty_cycle > 100 ? 100 : new_duty_cycle;
+                    toUpdate[index] = 1;
+                } 
+            } 
+
+            if (index == 0) {
+                on_capture(true);
+            } 
 
         } else {
             if (abs(now - s->comps[index].rising_edge_time) > (s->comps[index].period * 4) && s->comps[index].duty_cycle != 0) {
+                // Soft reset of values
                 s->comps[index].rising_edge_time = now;
                 s->comps[index].duty_cycle = 0;
                 toUpdate[index] = 1;
-            }
-            // faling edge 
 
+            }
+            // f\aling edge 
             s->comps[index].falling_edge_time = now;
+            
+            // pulsecap
+            if (index == 0) {
+                on_capture(false);
+            }
         }
     }
 
@@ -478,7 +586,7 @@ static void xlnx_axi_gpio_write(void *opaque, hwaddr addr,
 
     //publish
     evt->value = value;
-    evt->data = (void*)100;
+    evt->data = (void*)0;
     // ret = zedmon_notify_event(ZEDMON_EVENT_CLASS_GPIO, evt,
     //                         ZEDMON_EVENT_FLAG_DESTROY);
     if(ret)
