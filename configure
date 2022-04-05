@@ -1601,6 +1601,10 @@ for opt do
   ;;
   --disable-plugins) plugins="no"
   ;;
+  --enable-libudev) libudev="yes"
+  ;;
+  --disable-libudev) libudev="no"
+  ;;
   --enable-containers) use_containers="yes"
   ;;
   --disable-containers) use_containers="no"
