@@ -1,2 +1,0 @@
-common-obj-$(CONFIG_ZMQ) += zedmon.o mqueue.o
-zedmon.o-libs := $(ZMQ_LIBS)
