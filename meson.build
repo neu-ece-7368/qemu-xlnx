@@ -498,9 +498,11 @@ if targetos == 'linux' and (have_system or have_tools)
                        required: get_option('libudev'),
                        kwargs: static_kwargs)
 endif
+have_zedmon = false
 libzmq = not_found
 if 'CONFIG_ZMQ' in config_host
   libzmq = dependency('libzmq')
+  have_zedmon = true
 endif
 
 mpathlibs = [libudev]
@@ -2193,7 +2195,9 @@ subdir('qom')
 subdir('authz')
 subdir('crypto')
 subdir('ui')
-
+if have_zedmon
+  subdir('zedmon')
+endif
 
 if enable_modules
   libmodulecommon = static_library('module-common', files('module-common.c') + genh, pic: true, c_args: '-DBUILD_DSO')
