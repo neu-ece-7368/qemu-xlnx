@@ -32,7 +32,7 @@ softmmu_ss.add(when: 'CONFIG_XLNX_ZYNQMP', if_true: files(
   'xilinx-serdes.c',
   'reset-dev.c',
   'reset-domain.c',
-  'xlnx-axi-fifo.c'
+  'xilinx-axi-fifo.c'
 ))
 
 softmmu_ss.add(when: 'CONFIG_XLNX_ZYNQMP_CSU', if_true: files(

@@ -500,7 +500,7 @@ if targetos == 'linux' and (have_system or have_tools)
 endif
 libzmq = not_found
 if 'CONFIG_ZMQ' in config_host
-  libzmq = declare_dependency('libzmq')
+  libzmq = dependency('libzmq')
 endif
 
 mpathlibs = [libudev]
