@@ -86,6 +86,7 @@ typedef struct XlnxAXIGPIO {
     uint64_t falling_edge_time;
     uint64_t duty_cycle; // whole number 1-1000
     uint64_t period;
+    XlixAXIGPIOComponent comps[GPIO_MAX];
 } XlnxAXIGPIO;
 
 #define MAX_GPIOCHIP_COUNT 32
@@ -517,64 +518,41 @@ static void xlnx_axi_gpio_write(void *opaque, hwaddr addr,
     }
 
 
-        //publish event
-        evt = (GPIOEvent*)malloc(sizeof(GPIOEvent));
+    //publish event
+    evt = (GPIOEvent*)malloc(sizeof(GPIOEvent));
 
-        if (!evt)
-        {
-            return;
-        }
+    if (!evt)
+    {
+        return;
+    }
 
-        if (addr == 0x00 || addr == 0x08)
+    if (addr == 0x00 || addr == 0x08)
+    {
+        evt->type = GPIO_EVT_VALUE;
+        if (addr == 0x00)
         {
-            evt->type = GPIO_EVT_VALUE;
-            if (addr == 0x00)
-            {
-                evt->channel = 0;
-            }
-            else
-            {
-                evt->channel = 1;
-            }
-        }
-        else if (addr == 0x04 || addr == 0x0C)
-        {
-            evt->type = GPIO_EVT_DIRECTION;
-            if (addr == 0x04)
-            {
-                evt->channel = 0;
-            }
-            else
-            {
-                evt->channel = 1;
-            }
+            evt->channel = 0;
         }
         else
         {
-            return;
+            evt->channel = 1;
         }
-
-
-        ret = find_axi_gpio_chip_number(s);
-        if (ret < 0)
+    }
+    else if (addr == 0x04 || addr == 0x0C)
+    {
+        evt->type = GPIO_EVT_DIRECTION;
+        if (addr == 0x04)
         {
-            //error
-            //return;
-            ret = 0xFF;
+            evt->channel = 0;
         }
-        evt->gpio_dev = ret;
-
-        //publish
-        evt->value = index;
-        evt->data = (void*)s->comps[index].duty_cycle;
-        ret = zedmon_notify_event(ZEDMON_EVENT_CLASS_GPIO, evt,
-                                ZEDMON_EVENT_FLAG_DESTROY);
-        if(ret)
+        else
         {
-            //error occurred
-        } else {
-            //printf("Sent event\n");
+            evt->channel = 1;
         }
+    }
+    else
+    {
+        return;
     }
 
     ret = find_axi_gpio_chip_number(s);
@@ -590,7 +568,7 @@ static void xlnx_axi_gpio_write(void *opaque, hwaddr addr,
     evt->value = value;
     evt->data = (void*)0;
     // Event commentde out since it's the original event, wanted to preserve
-    // But isn't used any more currently. 
+    // But isn't used any more currently.
     // ret = zedmon_notify_event(ZEDMON_EVENT_CLASS_GPIO, evt,
     //                         ZEDMON_EVENT_FLAG_DESTROY);
     if(ret)
