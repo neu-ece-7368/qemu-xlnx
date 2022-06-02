@@ -498,6 +498,10 @@ if targetos == 'linux' and (have_system or have_tools)
                        required: get_option('libudev'),
                        kwargs: static_kwargs)
 endif
+libzmq = not_found
+if 'CONFIG_ZMQ' in config_host
+  libzmq = declare_dependency('libzmq')
+endif
 
 mpathlibs = [libudev]
 mpathpersist = not_found
@@ -3085,6 +3089,7 @@ summary_info += {'libusb':            libusb.found()}
 summary_info += {'usb net redir':     usbredir.found()}
 summary_info += {'OpenGL support':    config_host.has_key('CONFIG_OPENGL')}
 summary_info += {'GBM':               config_host.has_key('CONFIG_GBM')}
+summary_info += {'ZMQ':               config_host.has_key('CONFIG_ZMQ')}
 summary_info += {'libiscsi support':  libiscsi.found()}
 summary_info += {'libnfs support':    libnfs.found()}
 if targetos == 'windows'
@@ -3108,6 +3113,7 @@ summary_info += {'capstone':          capstone_opt == 'disabled' ? false : capst
 summary_info += {'libpmem support':   libpmem.found()}
 summary_info += {'libdaxctl support': libdaxctl.found()}
 summary_info += {'libudev':           libudev.found()}
+summary_info += {'libzmq':            libzmq.found()}
 summary_info += {'FUSE lseek':        fuse_lseek.found()}
 summary(summary_info, bool_yn: true, section: 'Dependencies')
 
