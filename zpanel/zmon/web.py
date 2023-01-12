@@ -155,4 +155,4 @@ class ZWebInterface:
         self._cli.get_gpio_dir(self._LED_GPIOCHIP, self._recv_led_dir)
 
         self._logger.debug("starting web interface")
-        run(server="cherrypy", host=self._bind_to, port=self._srv_port)
+        run(server="cheroot", host=self._bind_to, port=self._srv_port)
