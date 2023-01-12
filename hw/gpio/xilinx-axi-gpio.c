@@ -62,6 +62,8 @@ REG32(IP_IER, 0x128)
 
 #define R_MAX (R_IP_IER + 1)
 #define GPIO_MAX 8
+// maximum period to consider PWM is 100 ms
+#define MAX_PWM_PER_NS 100000000
 
 typedef struct XlixAXIGPIOComponent {
     uint64_t rising_edge_time; // ns
@@ -71,6 +73,8 @@ typedef struct XlixAXIGPIOComponent {
     uint64_t sum;
     uint64_t duty_cycle;  // whole number 1-100
     uint64_t period;
+    uint8_t isPWM;
+    uint8_t lastValue;
 } XlixAXIGPIOComponent;
 
 typedef struct XlnxAXIGPIO {
@@ -437,17 +441,38 @@ static void xlnx_axi_gpio_write(void *opaque, hwaddr addr,
 
     // Rising edge
     int64_t now = qemu_clock_get_ns(QEMU_CLOCK_HOST);
-
-
     uint8_t index;
 
     for (index = 0; index < GPIO_MAX; index++) {
         toUpdate[index] = 0;
-        if (value & (1 << index)) {
-
-            // calculate time since last rising edge
-            uint64_t period =  now - s->comps[index].rising_edge_time; // in nanoseconds;
-
+        uint8_t gpio_value = (value & (1<<index)) ? 1 : 0;
+        // calculate time since last rising edge
+        uint64_t last_rising = s->comps[index].rising_edge_time;
+        uint64_t period = now - last_rising; // in nanoseconds;
+        s->comps[index].isPWM = (period >= MAX_PWM_PER_NS) ? 0 : 1;
+        if (!s->comps[index].isPWM) {
+            if (gpio_value != s->comps[index].lastValue) {
+              s->comps[index].duty_cycle = (gpio_value) ? 100 : 666;
+              s->comps[index].period = MAX_PWM_PER_NS;
+              s->comps[index].lastValue = gpio_value;
+              toUpdate[index] = 1;
+            }
+        }
+        if (index == 0) {
+            if (gpio_value) {
+              on_capture(true);
+            } else {
+                on_capture(false);
+            }
+        }
+        if (gpio_value) {
+            /* s->comps[index].falling_edge_time = */
+            /*     s->comps[index].rising_edge_time; */
+            s->comps[index].rising_edge_time = now;
+        } else {
+            s->comps[index].falling_edge_time = now;
+        }
+        if (value & (1 << index) && s->comps[index].isPWM) {
             if (period > (s->comps[index].period * 4)) {
                 uint64_t filler_dc = 100; //xlnx_calculate_duty_cycle(now, s->comps[index].falling_edge_time, period);
 
@@ -459,15 +484,15 @@ static void xlnx_axi_gpio_write(void *opaque, hwaddr addr,
 
                 toUpdate[index] = 1;
                 s->comps[index].period = period;
-                s->comps[index].falling_edge_time =  s->comps[index].rising_edge_time;
-                s->comps[index].rising_edge_time = now;
+                /* s->comps[index].falling_edge_time =  s->comps[index].rising_edge_time; */
+                /* s->comps[index].rising_edge_time = now; */
 
 
-            } else {
+            } else if (s->comps[index].isPWM) {
                 s->comps[index].period = period;
 
                 uint64_t calculated_duty_cycle = xlnx_calculate_duty_cycle(now, s->comps[index].falling_edge_time, period);
-                s->comps[index].rising_edge_time = now;
+                /* s->comps[index].rising_edge_time = now; */
 
 
                 // Moving average for duty_cycle since calculations fluctuate and aren't precise
@@ -495,10 +520,6 @@ static void xlnx_axi_gpio_write(void *opaque, hwaddr addr,
                 } 
             } 
 
-            if (index == 0) {
-                on_capture(true);
-            } 
-
         } else {
             if (abs(now - s->comps[index].rising_edge_time) > (s->comps[index].period * 4) && s->comps[index].duty_cycle != 0) {
                 // Soft reset of values
@@ -509,11 +530,6 @@ static void xlnx_axi_gpio_write(void *opaque, hwaddr addr,
             }
             // f\aling edge 
             s->comps[index].falling_edge_time = now;
-            
-            // pulsecap
-            if (index == 0) {
-                on_capture(false);
-            }
         }
     }
 
