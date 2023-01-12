@@ -13,7 +13,7 @@ class ZEvtClient(StoppableThread):
 
     _GPIO_EVT_REGEX = re.compile(
         r"GPIO\s+([0-9]+)\s+CHANNEL\s+([0-9]+)\s+EVENT\s+([a-zA-Z0-9]+)\s+"
-        r"DATA\s+([a-zA-Z0-9]+).*"
+        r"DATA\s+([a-zA-Z0-9]+)\s+VALUE\s+([0-9]+)"
     )
     _TIMER_EVT_REGEX = re.compile(
         r"TIMER\s+EVENT\s+([a-zA-Z0-9]+)\s+" r"DATA\s+([a-zA-Z0-9]+).*"
@@ -56,7 +56,7 @@ class ZEvtClient(StoppableThread):
                                 "channel": int(m.group(2)),
                                 "event": m.group(3),
                                 "data": int(m.group(4)),
-                                "value": int(m.group(5).split("0x")[1], 16),
+                                "value": int(m.group(5)),
                             }
                         )
                 m = self._TIMER_EVT_REGEX.match(evt_str)
