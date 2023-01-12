@@ -1,12 +1,5 @@
 git+https://github.com/bottlepy/bottle.git@master
-cheroot==6.0.0
-CherryPy==13.0.0
-jaraco.classes==1.4.3
-more-itertools==4.0.1
-portend==2.2
-pytz==2017.3
-pyzmq==16.0.3
+cheroot==9.0.0
+pyzmq==25.0.0
 simpleaudio==1.0.4
-six==1.11.0
-tempora==1.9
 zmq==0.0.0
