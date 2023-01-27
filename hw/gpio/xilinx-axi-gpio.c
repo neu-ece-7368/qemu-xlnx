@@ -84,8 +84,11 @@ typedef struct XlnxAXIGPIO {
     qemu_irq parent_irq;
     qemu_irq outputs1[32], outputs2[32];
 
+    // bmorais: really odd structure, but not going to make it right
     uint32_t regs[R_MAX];
     RegisterInfo regs_info[R_MAX];
+    // bmorais: add register info array here
+    RegisterInfoArray *reg_array;
     uint64_t rising_edge_time;
     uint64_t falling_edge_time;
     uint64_t duty_cycle; // whole number 1-1000
@@ -408,12 +411,12 @@ static void xlnx_axi_gpio_write(void *opaque, hwaddr addr,
         break;
       }
     }
-    
-    register_write_memory(opaque, addr, value, size);
 
     if (!reg) {
-        return;
+      return;
     }
+
+    register_write_memory(opaque, addr, value, size);
 
     s = XLNX_AXI_GPIO(reg->opaque);
 
@@ -623,7 +626,8 @@ static int xlnx_axi_gpio_write_from_monitor(unsigned int pIdx,
         return -1;
     }
 
-    xlnx_axi_gpio_write(gpioClass.chips[pIdx], dIdx, *(uint64_t*)data, 0);
+    xlnx_axi_gpio_write(gpioClass.chips[pIdx]->reg_array,
+                        dIdx, *(uint64_t*)data, 4);
 
     return 0;
 }
@@ -691,6 +695,9 @@ static void xlnx_axi_gpio_init(Object *obj)
     for (i = 0; i < GPIO_MAX; i++) {
         initalize_component(&s->comps[i]);
     }
+
+    // register array
+    s->reg_array = reg_array;
 }
 
 static const VMStateDescription vmstate_gpio = {
@@ -716,6 +723,7 @@ static void xlnx_axi_gpio_class_init(ObjectClass *klass, void *data)
 
     //register
 #ifdef CONFIG_ZMQ
+    // NOTE: this is the only peripheral that allows read/write
     zedmon_register_peripheral(ZEDMON_EVENT_CLASS_GPIO, "AXIGPIO",
                                xlnx_axi_gpio_read_from_monitor,
                                xlnx_axi_gpio_write_from_monitor);
